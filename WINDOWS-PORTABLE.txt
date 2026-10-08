@@ -1,0 +1,14 @@
+BetterNotes for Windows (portable)
+
+1. Extract every file in this archive into one folder.
+2. Open better_notes.exe. Keep the data folder and DLL files next to it.
+3. Create notes with the New note button or Ctrl+N. Right-click the running
+   app's taskbar icon for the New note action.
+4. Notes save automatically on this computer. Closing a note window does not
+   delete its note. Open notes return when the app starts again.
+5. In Settings, turn on Start with Windows if you want BetterNotes to open
+   when you sign in. This is off by default. If you move this extracted folder,
+   turn that setting off and on again from the new location.
+
+This build uses local storage until Google account sync is configured.
+Your notes are stored in the Windows app-data folder, not in this archive.
