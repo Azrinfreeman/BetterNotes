@@ -32,6 +32,14 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       command_channel_;
+  // System tray icon and global quick-capture hotkey (both opt-in).
+  bool SetTrayVisible(bool visible);
+  void ShowTrayMenu();
+  void ShowMainWindow();
+  DWORD SetQuickCaptureHotkey(bool enabled, UINT modifiers, UINT key);
+  bool tray_visible_ = false;
+  bool hotkey_registered_ = false;
+  UINT taskbar_created_message_ = 0;
   bool commands_ready_ = false;
   bool pending_new_note_ = false;
 };

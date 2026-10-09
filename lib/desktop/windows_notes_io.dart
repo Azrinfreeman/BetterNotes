@@ -5,9 +5,12 @@ import 'dart:io';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'tray.dart';
+import 'window_fit.dart';
 import '../data/note.dart';
 import '../state/note_editor_store.dart';
 export 'remote_note_editor_store.dart';
@@ -75,6 +78,10 @@ class DesktopCoordinator with WindowListener {
     controller.flushDesktopEditors = flushChildren;
     controller.flushDesktopEditor = flushChild;
     controller.applyFastNoteOpening = _applyFastOpening;
+    controller.applyTray = () =>
+        DesktopIntegration.setTray(controller.keepInTray);
+    controller.applyQuickCapture = () =>
+        DesktopIntegration.setQuickCapture(controller.quickCaptureKey);
     final remembered =
         await controller.store.getSetting<List<dynamic>>('openNoteWindows') ??
         const [];
@@ -87,9 +94,28 @@ class DesktopCoordinator with WindowListener {
     runner.setMethodCallHandler((call) async {
       if (call.method == 'newNote') {
         await createAndOpenNote();
+      } else if (call.method == 'quit') {
+        await _closeMain();
       }
     });
     controller.addListener(_broadcast);
+    try {
+      if (controller.keepInTray) await DesktopIntegration.setTray(true);
+    } catch (_) {
+      // Without a tray icon the window must still close normally.
+      controller.keepInTray = false;
+    }
+    try {
+      if (controller.quickCaptureKey != 'off') {
+        await DesktopIntegration.setQuickCapture(controller.quickCaptureKey);
+      }
+    } catch (_) {
+      final label =
+          quickCapturePresets[controller.quickCaptureKey]?.label ?? 'shortcut';
+      controller.quickCaptureError =
+          'The quick note shortcut $label could not be registered; another app may be using it. Choose a different one in Settings.';
+      controller.quickCaptureKey = 'off';
+    }
     await _restoreWindows();
     // Pay for one native engine before the library becomes interactive. Reuse
     // this bounded spare for the next open and park an editor when it closes.
@@ -550,14 +576,23 @@ class DesktopCoordinator with WindowListener {
   Future<void> _applyBounds(List<dynamic>? bounds) async {
     if (bounds != null && bounds.length == 4) {
       final values = bounds.cast<num>();
-      await windowManager.setBounds(
-        Rect.fromLTWH(
-          values[0].toDouble(),
-          values[1].toDouble(),
-          values[2].toDouble(),
-          values[3].toDouble(),
-        ),
+      var rect = Rect.fromLTWH(
+        values[0].toDouble(),
+        values[1].toDouble(),
+        values[2].toDouble(),
+        values[3].toDouble(),
       );
+      try {
+        final displays = await screenRetriever.getAllDisplays();
+        rect = fitToDisplays(rect, [
+          for (final display in displays)
+            (display.visiblePosition ?? Offset.zero) &
+                (display.visibleSize ?? display.size),
+        ]);
+      } catch (_) {
+        // Keep the remembered position if displays cannot be queried.
+      }
+      await windowManager.setBounds(rect);
     } else {
       await windowManager.setSize(const Size(470, 520));
       await windowManager.center();
@@ -615,6 +650,11 @@ class DesktopCoordinator with WindowListener {
   @override
   void onWindowClose() {
     if (!isNoteWindow) {
+      if (_mainController?.keepInTray == true && !_shuttingDown) {
+        // Tray mode: closing the library hides it; Quit in the tray menu exits.
+        unawaited(windowManager.hide());
+        return;
+      }
       unawaited(_closeMain());
     } else if (noteId == null) {
       unawaited(_destroySelf());

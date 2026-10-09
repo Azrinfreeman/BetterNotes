@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../auth/sign_in.dart';
 import '../data/backup.dart';
+import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup_files.dart' as backup_files;
 import '../desktop/auto_start.dart';
+import '../desktop/tray.dart';
 import '../desktop/window_chrome.dart';
 import '../state/notes_controller.dart';
 import 'shortcuts_help.dart';
@@ -24,6 +27,90 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _loadingAutoStart = false;
   bool _savingAutoStart = false;
   bool _workingFiles = false;
+
+  List<Widget> _autoBackupTiles() {
+    final c = widget.controller;
+    final last = c.autoBackupLast;
+    final status = c.autoBackupRunning
+        ? 'Backing up now...'
+        : c.autoBackupError ??
+              (last == null
+                  ? 'No automatic backup has run yet.'
+                  : 'Last backup: ${last.toLocal().toString().substring(0, 16)}');
+    return [
+      ListTile(
+        leading: const Icon(Icons.schedule_outlined),
+        title: const Text('Automatic backups'),
+        subtitle: Text(
+          c.autoBackupFolder == null
+              ? 'Off. Choose a folder to save a complete backup about once a day.'
+              : '${c.autoBackupFolder}\n$status',
+        ),
+        textColor: c.autoBackupError == null
+            ? null
+            : Theme.of(context).colorScheme.error,
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 4,
+            children: [
+              TextButton(
+                key: const ValueKey('auto-backup-choose'),
+                onPressed: () async {
+                  final folder = await auto_backup.chooseBackupFolder();
+                  if (folder != null) await c.setAutoBackupFolder(folder);
+                },
+                child: Text(
+                  c.autoBackupFolder == null ? 'Choose folder' : 'Change',
+                ),
+              ),
+              if (c.autoBackupFolder != null)
+                TextButton(
+                  onPressed: () => c.setAutoBackupFolder(null),
+                  child: const Text('Turn off'),
+                ),
+            ],
+          ),
+        ),
+      ),
+      if (c.autoBackupFolder != null) ...[
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            children: [
+              const Text('Keep the newest backups'),
+              DropdownButton<int>(
+                key: const ValueKey('auto-backup-keep'),
+                value: const [3, 7, 14, 30].contains(c.autoBackupKeep)
+                    ? c.autoBackupKeep
+                    : 7,
+                items: const [
+                  DropdownMenuItem(value: 3, child: Text('3')),
+                  DropdownMenuItem(value: 7, child: Text('7')),
+                  DropdownMenuItem(value: 14, child: Text('14')),
+                  DropdownMenuItem(value: 30, child: Text('30')),
+                ],
+                onChanged: (keep) {
+                  if (keep != null) c.setAutoBackupKeep(keep);
+                },
+              ),
+              TextButton(
+                onPressed: c.autoBackupRunning
+                    ? null
+                    : () => c.runAutoBackup(force: true),
+                child: const Text('Back up now'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ];
+  }
 
   Future<void> _fileAction(Future<String?> Function() action) async {
     if (_workingFiles) return;
@@ -364,6 +451,75 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             SwitchListTile(
+              key: const ValueKey('keep-in-tray'),
+              secondary: const Icon(Icons.dock_outlined),
+              title: const Text('Keep running in the system tray'),
+              subtitle: const Text(
+                'Closing the notes window hides it; use the tray icon to open '
+                'notes, start a note, or Quit.',
+              ),
+              value: widget.controller.keepInTray,
+              onChanged: (value) async {
+                try {
+                  await widget.controller.setKeepInTray(value);
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not change tray mode: $error'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Quick note shortcut'),
+                  Text(
+                    widget.controller.quickCaptureError ?? 'A global shortcut that opens a new note from any app while BetterNotes is running.',
+                    style: widget.controller.quickCaptureError == null
+                        ? null
+                        : TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                  DropdownButton<String>(
+                    key: const ValueKey('quick-capture'),
+                    isExpanded: true,
+                    value: widget.controller.quickCaptureKey,
+                    onChanged: (value) async {
+                      if (value == null) return;
+                      try {
+                        await widget.controller.setQuickCaptureKey(value);
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                error is PlatformException &&
+                                        error.code == 'hotkey_in_use'
+                                    ? 'Another app already uses that shortcut. Choose a different one.'
+                                    : 'Could not set the shortcut: $error',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    items: [
+                      for (final entry in quickCapturePresets.entries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value.label),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SwitchListTile(
               key: const ValueKey('fast-note-opening'),
               secondary: const Icon(Icons.bolt_outlined),
               title: const Text('Fast note opening'),
@@ -481,6 +637,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? null
                 : () => _fileAction(_importBackup),
           ),
+          if (auto_backup.canAutoBackup) ..._autoBackupTiles(),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Export active notes as text'),

@@ -765,6 +765,29 @@ class _NotesHomeState extends State<NotesHome> {
                           AnimatedBuilder(
                             animation: widget.controller,
                             builder: (context, _) =>
+                                widget.controller.autoBackupError == null
+                                ? const SizedBox.shrink()
+                                : Semantics(
+                                    liveRegion: true,
+                                    child: ListTile(
+                                      leading: const Icon(
+                                        Icons.backup_outlined,
+                                      ),
+                                      title: Text(
+                                        widget.controller.autoBackupError!,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      trailing: TextButton(
+                                        onPressed: _openSettings,
+                                        child: const Text('Settings'),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          AnimatedBuilder(
+                            animation: widget.controller,
+                            builder: (context, _) =>
                                 widget.controller.saveFailure == null
                                 ? const SizedBox.shrink()
                                 : Semantics(

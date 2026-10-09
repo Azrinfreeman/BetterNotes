@@ -194,6 +194,9 @@ class LocalStore {
   Future<void> setSetting(String key, Object value) =>
       _settings.record(key).put(database, {'value': value});
 
+  Future<void> deleteSetting(String key) =>
+      _settings.record(key).delete(database);
+
   Future<T?> getSetting<T>(String key) async {
     final record = await _settings.record(key).get(database);
     return record?['value'] as T?;
