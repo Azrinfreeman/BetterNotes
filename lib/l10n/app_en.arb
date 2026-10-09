@@ -1,11 +1,17 @@
 {
   "@@locale": "en",
-
   "aboutTitle": "About BetterNotes",
   "aboutTagline": "A colorful home for little ideas.",
   "aboutVersion": "Version {version} (build {build})",
   "@aboutVersion": {
-    "placeholders": { "version": { "type": "String" }, "build": { "type": "String" } }
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
   },
   "aboutDataTitle": "Notes data",
   "aboutDataBrowser": "Stored in this browser.",
@@ -16,21 +22,42 @@
   "aboutPrivacy": "BetterNotes keeps notes and a small error log on this device. It collects no usage data and sends nothing without your sign-in and sync settings. Diagnostics hold versions, counts, and settings states only, never note text.",
   "settingsAboutSubtitle": "Version {version} · diagnostics and data location",
   "@settingsAboutSubtitle": {
-    "placeholders": { "version": { "type": "String" } }
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
   },
-
   "reminderTitle": "Reminder",
   "reminderShownAt": "Shown {time}",
-  "@reminderShownAt": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderShownAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderSetFor": "Set for {time}",
-  "@reminderSetFor": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderSetFor": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderPickDateTime": "Pick date and time…",
   "reminderBestEffort": "Reminders are best effort. BetterNotes must be running, or the scheduled-task option in Settings turned on; a reminder missed while the PC was off is shown the next time the app starts.",
   "reminderClear": "Clear reminder",
   "reminderClose": "Close",
   "reminderCleared": "Reminder cleared.",
   "reminderSetSnack": "Reminder set for {time}.",
-  "@reminderSetSnack": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderSetSnack": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderChooseFuture": "Choose a time in the future.",
   "reminderSnooze": "Snooze",
   "reminderDone": "Done",
@@ -40,15 +67,725 @@
   "reminderPresetTomorrow": "Tomorrow morning (9 AM)",
   "reminderPresetMonday": "Next Monday (9 AM)",
   "reminderToday": "Today {time}",
-  "@reminderToday": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderTomorrow": "Tomorrow {time}",
-  "@reminderTomorrow": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderOn": "{date} {time}",
   "@reminderOn": {
-    "placeholders": { "date": { "type": "String" }, "time": { "type": "String" } }
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "reminderCardLabel": "Reminder {time}",
-  "@reminderCardLabel": { "placeholders": { "time": { "type": "String" } } },
+  "@reminderCardLabel": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "reminderCardShown": "Reminder shown {time}",
-  "@reminderCardShown": { "placeholders": { "time": { "type": "String" } } }
+  "@reminderCardShown": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "windowChromeCouldNotChangeWindowButtons": "Could not change window buttons: {error}",
+  "@windowChromeCouldNotChangeWindowButtons": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "windowChromeBetternotes": "BetterNotes",
+  "windowChromeMinimize": "Minimize",
+  "windowChromeCloseWindow": "Close window",
+  "bulkSetColor": "Set color",
+  "bulkCancel": "Cancel",
+  "bulkAddTags": "Add tags",
+  "bulkAdd": "Add",
+  "bulkTags": "Tags",
+  "bulkWorkIdeas": "work, ideas",
+  "drawingDrawOnNote": "Draw on note",
+  "drawingClear": "Clear",
+  "findBarFindInThisNoteCtrl": "Find in this note (Ctrl+H)",
+  "findBarPreviousMatch": "Previous match",
+  "findBarNextMatch": "Next match",
+  "findBarCloseFind": "Close find",
+  "noteShowAllNotes": "Show all notes",
+  "noteCreateANote": "Create a note",
+  "notePermanentlyDeleteThisNote": "Permanently delete this note?",
+  "noteThisCannotBeUndoneA": "This cannot be undone. A previously exported backup will keep its copy.",
+  "noteDeletePermanently": "Delete permanently",
+  "noteRestore": "Restore",
+  "noteNoteRestoredFromArchive": "Note restored from Archive",
+  "noteCouldNotRestore": "Could not restore: {error}",
+  "@noteCouldNotRestore": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteRestoreFromArchive": "Restore from Archive",
+  "noteCouldNotUpdateNote": "Could not update note: {error}",
+  "@noteCouldNotUpdateNote": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteDeleteThisNote": "Delete this note?",
+  "noteMoveThisNoteToTrash": "Move this note to Trash? You can restore it later.",
+  "noteDelete": "Delete",
+  "noteCouldNotMoveToTrash": "Could not move to Trash: {error}",
+  "@noteCouldNotMoveToTrash": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteDuplicateNote": "Duplicate note",
+  "noteArchiveNote": "Archive note",
+  "noteDeleteNote": "Delete note",
+  "noteImageUnavailable": "Image unavailable",
+  "noteRetryLoadingOrRestoreA": "Retry loading or restore a copy from a complete backup.",
+  "noteRetryImage": "Retry image",
+  "noteUpdatedNote": "{displayTitle}. Updated {updatedAt}. {noteColorNames} note.",
+  "@noteUpdatedNote": {
+    "placeholders": {
+      "displayTitle": {
+        "type": "String"
+      },
+      "updatedAt": {
+        "type": "String"
+      },
+      "noteColorNames": {
+        "type": "String"
+      }
+    }
+  },
+  "noteFavorite": "Favorite",
+  "noteUpdatedNote2": "{displayTitle}. {preview}. Updated {updatedAt}. {noteColorNames} note.",
+  "@noteUpdatedNote2": {
+    "placeholders": {
+      "displayTitle": {
+        "type": "String"
+      },
+      "preview": {
+        "type": "String"
+      },
+      "updatedAt": {
+        "type": "String"
+      },
+      "noteColorNames": {
+        "type": "String"
+      }
+    }
+  },
+  "noteNoteOptions": "Note options",
+  "noteLoadingImage": "Loading image",
+  "noteAttachedNoteImage": "Attached note image",
+  "noteDesktopHeaderNewNote": "New note",
+  "noteDesktopHeaderChangeColor": "Change color",
+  "noteDesktopHeaderMoreActions": "More actions",
+  "noteDesktopHeaderCloseNote": "Close note",
+  "noteDetailsTitleAndTags": "Title and tags",
+  "noteDetailsSave": "Save",
+  "noteDetailsTitleOptional": "Title (optional)",
+  "noteDetailsUsesTheFirstTextLine": "Uses the first text line when blank",
+  "noteDetailsWorkIdeasPersonal": "work, ideas, personal",
+  "noteImageEmbedRemoveImage": "Remove image",
+  "noteVersionHistory": "Version history",
+  "noteExportAsMarkdown": "Export as Markdown",
+  "noteExportAsPdfToPrint": "Export as PDF (to print)",
+  "noteFindInNoteCtrlH": "Find in note (Ctrl+H)",
+  "noteKeyboardShortcutsF": "Keyboard shortcuts (F1)",
+  "noteMovedToTrash": "Moved to Trash",
+  "noteNoteColor": "Note color",
+  "noteShareText": "Share text",
+  "noteSaveFailedKeepEditingOr": "Save failed. Keep editing or retry.",
+  "noteRetry": "Retry",
+  "noteCut": "Cut",
+  "noteCopy": "Copy",
+  "notePaste": "Paste",
+  "noteSelectAll": "Select all",
+  "noteHighlightColor": "Highlight color",
+  "noteUndo": "Undo",
+  "noteTextStyleOptions": "Text style options",
+  "noteAddImage": "Add image",
+  "notePasteImageFromClipboard": "Paste image from clipboard",
+  "noteTakePhoto": "Take photo",
+  "noteDraw": "Draw",
+  "notesHomeSaveThisSearch": "Save this search",
+  "notesHomeCouldNotSaveSearch": "Could not save search: {error}",
+  "@notesHomeCouldNotSaveSearch": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeSaveSearch": "Save search",
+  "notesHomeCouldNotSaveFilters": "Could not save filters: {error}",
+  "@notesHomeCouldNotSaveFilters": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeMatchAllSelectedTags": "Match all selected tags",
+  "notesHomeManageTags": "Manage tags",
+  "notesHomeClearTags": "Clear tags",
+  "notesHomeApply": "Apply",
+  "notesHomeNoteS": "{done}: {count} note(s).",
+  "@notesHomeNoteS": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeCouldNotUpdateNotes": "Could not update notes: {error}",
+  "@notesHomeCouldNotUpdateNotes": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeMoveNoteSToTrash": "Move {ids} note(s) to Trash?",
+  "@notesHomeMoveNoteSToTrash": {
+    "placeholders": {
+      "ids": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeYouCanRestoreThemFrom": "You can restore them from Trash later.",
+  "notesHomeMoveToTrash": "Move to Trash",
+  "notesHomeSelected": "{_selected} selected",
+  "@notesHomeSelected": {
+    "placeholders": {
+      "_selected": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeSelectAllShown": "Select all shown",
+  "notesHomeRemoveFavorite": "Remove favorite",
+  "notesHomeCouldNotCreateNote": "Could not create note: {error}",
+  "@notesHomeCouldNotCreateNote": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeCouldNotOpenNote": "Could not open note: {error}",
+  "@notesHomeCouldNotOpenNote": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeRecentlyEdited": "Recently edited",
+  "notesHomeNewestCreated": "Newest created",
+  "notesHomeTitleAZ": "Title A–Z",
+  "notesHomeResetFilters": "Reset filters",
+  "notesHomeSettings": "Settings",
+  "notesHomeSearchAllActiveNotesIncluding": "Search all active notes, including Archive",
+  "notesHomeName": "Name",
+  "notesHomeKeepsTheSearchTextView": "Keeps the search text, view, sort, and tags. Same name replaces.",
+  "notesHomeClearSelection": "Clear selection",
+  "notesHomeFavoriteSelected": "Favorite selected",
+  "notesHomeArchiveSelected": "Archive selected",
+  "notesHomeMoveSelectedToTrash": "Move selected to Trash",
+  "notesHomeMoreSelectionActions": "More selection actions",
+  "notesHomeSelected2": "Selected",
+  "notesHomeNewNoteFromTemplate": "New note from template",
+  "notesHomeSearchTitlesAndTextIn": "Search titles and text in this view",
+  "notesHomeClearSearch": "Clear search",
+  "reminderCouldNotSetTheReminder": "Could not set the reminder: {error}",
+  "@reminderCouldNotSetTheReminder": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderCouldNotUpdateTheReminder": "Could not update the reminder: {error}",
+  "@reminderCouldNotUpdateTheReminder": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAutomaticBackups": "Automatic backups",
+  "settingsTurnOff": "Turn off",
+  "settingsKeepTheNewestBackups": "Keep the newest backups",
+  "settingsBackUpNow": "Back up now",
+  "settingsFileOperationFailed": "File operation failed: {error}",
+  "@settingsFileOperationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsImportBackupAsCopies": "Import backup as copies?",
+  "settingsNotesInTrashImagesExisting": "{notes} notes ({trashCount} in Trash), {assets} images.\n\nExisting notes are kept. Importing the same backup again creates more copies.",
+  "@settingsNotesInTrashImagesExisting": {
+    "placeholders": {
+      "notes": {
+        "type": "String"
+      },
+      "trashCount": {
+        "type": "String"
+      },
+      "assets": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreAppearanceAndEditorPreferences": "Restore appearance and editor preferences",
+  "settingsImportCopies": "Import copies",
+  "settingsCouldNotReadWindowsStartup": "Could not read Windows startup setting: {error}",
+  "@settingsCouldNotReadWindowsStartup": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsCouldNotChangeWindowsStartup": "Could not change Windows startup: {error}",
+  "@settingsCouldNotChangeWindowsStartup": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSignInFailed": "Sign-in failed: {error}",
+  "@settingsSignInFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsContinueWithGoogle": "Continue with Google",
+  "settingsSignOut": "Sign out",
+  "settingsSyncNeedsAttention": "Sync needs attention",
+  "settingsAppearance": "Appearance",
+  "settingsSystem": "System",
+  "settingsLight": "Light",
+  "settingsDark": "Dark",
+  "settingsConfirmBeforeDeleting": "Confirm before deleting",
+  "settingsEmptyTrashAutomatically": "Empty Trash automatically",
+  "settingsPermanentlyDeletesLocalNotesAfter": "Permanently deletes local notes after this long in Trash. Signed-in account notes keep their sync records and are not removed.",
+  "settingsNever": "Never",
+  "settingsAfterDays": "After 7 days",
+  "settingsAfterDays2": "After 30 days",
+  "settingsAfterDays3": "After 90 days",
+  "settingsImagePlacement": "Image placement",
+  "settingsAppliesToNewImagesExisting": "Applies to new images. Existing images stay in place.",
+  "settingsAboveTextCurrent": "Above text (current)",
+  "settingsWithinNote": "Within note",
+  "settingsCouldNotSaveImagePlacement": "Could not save image placement: {error}",
+  "@settingsCouldNotSaveImagePlacement": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAlwaysShowNoteHeader": "Always show note header",
+  "settingsKeepNoteActionsVisibleWithout": "Keep note actions visible without hovering.",
+  "settingsCouldNotSaveHeaderPreference": "Could not save header preference: {error}",
+  "@settingsCouldNotSaveHeaderPreference": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRemindMeWhenBetternotesIs": "Remind me when BetterNotes is closed",
+  "settingsCouldNotUpdateTheScheduled": "Could not update the scheduled task: {error}",
+  "@settingsCouldNotUpdateTheScheduled": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsKeepRunningInTheSystem": "Keep running in the system tray",
+  "settingsClosingTheNotesWindowHides": "Closing the notes window hides it; use the tray icon to open notes, start a note, or Quit.",
+  "settingsCouldNotChangeTrayMode": "Could not change tray mode: {error}",
+  "@settingsCouldNotChangeTrayMode": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsQuickNoteShortcut": "Quick note shortcut",
+  "settingsFastNoteOpening": "Fast note opening",
+  "settingsKeepOneIdleNoteWindow": "Keep one idle note window ready. Uses some memory; turn off to open notes a little slower.",
+  "settingsCouldNotSaveThisPreference": "Could not save this preference: {error}",
+  "@settingsCouldNotSaveThisPreference": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWindowButtons": "Window buttons",
+  "settingsAppliesToAllBetternotesWindows": "Applies to all BetterNotes windows.",
+  "settingsCouldNotSaveWindowButtons": "Could not save window buttons: {error}",
+  "@settingsCouldNotSaveWindowButtons": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWindows": "Windows",
+  "settingsStartWithWindows": "Start with Windows",
+  "settingsOpenBetternotesWhenYouSign": "Open BetterNotes when you sign in to Windows.",
+  "settingsBackupAndRestore": "Backup and restore",
+  "settingsCompleteBackupsIncludeTrashFormatting": "Complete backups include Trash, formatting, images, and drawings. Exported files are readable and unencrypted.",
+  "settingsExportCompleteBackup": "Export complete backup",
+  "settingsImportBackup": "Import backup",
+  "settingsReviewAndAddCopiesWithout": "Review and add copies without replacing existing notes.",
+  "settingsImportIsNotAvailableOn": "Import is not available on this platform.",
+  "settingsExportActiveNotesAsText": "Export active notes as text",
+  "settingsTextOnlyUseAComplete": "Text only; use a complete backup for restoration.",
+  "settingsKeyboardShortcuts": "Keyboard shortcuts",
+  "settingsEditingSearchAndWindowControls": "Editing, search, and window controls.",
+  "shortcutsHelpLibraryAndNoteWindows": "Library and note windows",
+  "shortcutsHelpCtrlNNewNoteCtrl": "Ctrl+N — New note\nCtrl+F — Search library\nF1 — Shortcut help",
+  "shortcutsHelpInANote": "In a note",
+  "shortcutsHelpCtrlWSaveAndClose": "Ctrl+W — Save and close\nCtrl+D — Move to Trash\nCtrl+H — Find in this note\nEnter / Shift+Enter — Next / previous match\nEscape — Close find\nCtrl+Shift+V — Paste as plain text\nPaste a web address over selected text — Make a link",
+  "shortcutsHelpWhileEditingText": "While editing text",
+  "shortcutsHelpCtrlBIUT": "Ctrl+B / I / U / T — Bold / italic / underline / strikethrough\nCtrl+Shift+L — Bulleted list\nCtrl+Z — Undo\nCtrl+Y — Redo\nCtrl+C / X / V / A — Copy / cut / paste / select all",
+  "shortcutsHelpSelectTextThenOpenText": "Select text, then open Text style options beside Add image for font size, text color, highlighting, headings, numbered lists, quotes, inline code, and clear formatting. With no selection, styles apply to what you type next.",
+  "shortcutsHelpUseTabAndShiftTab": "Use Tab and Shift+Tab to move between controls, and Enter or Space to activate them. Checklists, title, tags, favorites, and Archive are available from the toolbar or note menus. Closing keeps the note; deleting moves it to Trash.",
+  "startupErrorBetternotesCouldnTOpenYour": "BetterNotes couldn't open your notes",
+  "startupErrorNothingWasChangedOrDeleted": "Nothing was changed or deleted. Try again first; if the problem continues, start with an empty library and restore from a backup.",
+  "startupErrorTryAgain": "Try again",
+  "startupErrorCopyDetails": "Copy details",
+  "startupErrorStartEmptyKeepACopy": "Start empty (keep a copy)",
+  "startupErrorStartWithAnEmptyLibrary": "Start with an empty library?",
+  "startupErrorTheUnreadableLibraryFileIs": "The unreadable library file is renamed, not deleted, so it can still be recovered. Notes in your account sync back if you sign in; otherwise restore a backup from Settings.",
+  "startupErrorStartEmpty": "Start empty",
+  "tagManagerNoTagsYetAddTags": "No tags yet. Add tags from a note’s menu.",
+  "tagManagerCouldNotChangeTag": "Could not change tag: {error}",
+  "@tagManagerCouldNotChangeTag": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tagManagerRename": "Rename “{tag}”",
+  "@tagManagerRename": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "tagManagerRename2": "Rename",
+  "tagManagerDeleteTag": "Delete tag “{tag}”?",
+  "@tagManagerDeleteTag": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "tagManagerTheTagIsRemovedFrom": "The tag is removed from every note. Notes stay.",
+  "tagManagerDeleteTag2": "Delete tag",
+  "tagManagerRenameOrMerge": "Rename or merge {tag}",
+  "@tagManagerRenameOrMerge": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "tagManagerDeleteTag3": "Delete tag {tag}",
+  "@tagManagerDeleteTag3": {
+    "placeholders": {
+      "tag": {
+        "type": "String"
+      }
+    }
+  },
+  "tagManagerUsingAnExistingTagName": "Using an existing tag name merges the two.",
+  "textColorResetColor": "Reset color",
+  "textColorHexColor": "Hex color",
+  "textStylePanelSelectTextToStyleIt": "Select text to style it, or choose a style before typing.",
+  "textStylePanelTextColor": "Text color",
+  "versionHistoryCouldNotLoadVersions": "Could not load versions: {error}",
+  "@versionHistoryCouldNotLoadVersions": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "versionHistoryNoEarlierVersionsYetBetternotes": "No earlier versions yet. BetterNotes saves one while you edit, at most every 5 minutes, and keeps the latest {maxRevisionsPerNote}.",
+  "@versionHistoryNoEarlierVersionsYetBetternotes": {
+    "placeholders": {
+      "maxRevisionsPerNote": {
+        "type": "String"
+      }
+    }
+  },
+  "versionHistoryWords": "{createdAt} · {words} words",
+  "@versionHistoryWords": {
+    "placeholders": {
+      "createdAt": {
+        "type": "String"
+      },
+      "words": {
+        "type": "String"
+      }
+    }
+  },
+  "versionHistoryRestoreAsACopy": "Restore as a copy",
+  "bulkExportedNoteSAsMarkdown": "Exported {fresh} note(s) as Markdown.",
+  "@bulkExportedNoteSAsMarkdown": {
+    "placeholders": {
+      "fresh": {
+        "type": "String"
+      }
+    }
+  },
+  "noteImageUnavailableOpenTheNote": "Image unavailable. Open the note to retry or restore from a backup.",
+  "noteNoMatchingNotes": "No matching notes",
+  "noteAFreshSpaceForYour": "A fresh space for your ideas",
+  "noteTryAnotherWordOrClear": "Try another word or clear the search.",
+  "noteChooseAnotherViewOrReset": "Choose another view or reset filters to see your notes.",
+  "noteKeepAThoughtCloseStart": "Keep a thought close. Start with a note.",
+  "noteNotePermanentlyDeleted": "Note permanently deleted",
+  "noteNoteRestoredToNotes": "Note restored to Notes",
+  "noteInTrash": "In Trash",
+  "noteDeleted": "Deleted {deletedAt}",
+  "@noteDeleted": {
+    "placeholders": {
+      "deletedAt": {
+        "type": "String"
+      }
+    }
+  },
+  "noteAccountTrashRetainsSyncRecords": "Account Trash retains sync records",
+  "noteTodayAm": "Today 9:00 AM",
+  "noteDesktopHeaderTurnOffAlwaysOnTop": "Turn off always on top",
+  "noteDesktopHeaderAlwaysOnTop": "Always on top",
+  "noteWriteANote": "Write a note...",
+  "noteSetReminder": "Set reminder…",
+  "noteEditReminder": "Edit reminder…",
+  "noteSaveFailed": "Save failed",
+  "noteSaving": "Saving…",
+  "noteSavedLocally": "Saved locally",
+  "noteSavingLocally": "Saving locally",
+  "noteCouldNotReadAlwaysOn": "Could not read always on top: {error}",
+  "@noteCouldNotReadAlwaysOn": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotChangeAlwaysOn": "Could not change always on top: {error}",
+  "@noteCouldNotChangeAlwaysOn": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotSaveDetails": "Could not save details: {error}",
+  "@noteCouldNotSaveDetails": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteExported": "Exported \"{name}\".",
+  "@noteExported": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotExport": "Could not export: {error}",
+  "@noteCouldNotExport": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteDuplicatedAs": "Duplicated as \"{displayTitle}\".",
+  "@noteDuplicatedAs": {
+    "placeholders": {
+      "displayTitle": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotDuplicateNote": "Could not duplicate note: {error}",
+  "@noteCouldNotDuplicateNote": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteSaveFailedRetryBeforeReturning": "Save failed. Retry before returning to your notes.",
+  "noteSaveFailedRetrySavingBefore": "Save failed. Retry saving before closing, or keep editing.",
+  "noteCouldNotAddImage": "Could not add image: {error}",
+  "@noteCouldNotAddImage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteNoImageOnTheClipboard": "No image on the clipboard.",
+  "noteCouldNotPasteImage": "Could not paste image: {error}",
+  "@noteCouldNotPasteImage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotCompleteThatAction": "Could not complete that action: {error}",
+  "@noteCouldNotCompleteThatAction": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noteCouldNotChangeTextColor": "Could not change text color: {error}",
+  "@noteCouldNotChangeTextColor": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeDeleteSavedSearch": "Delete saved search {name}",
+  "@notesHomeDeleteSavedSearch": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeSyncNotes": "Sync notes",
+  "notesHomeLocalNotes": "Local notes",
+  "notesHomeAllActive": "All active",
+  "notesHomeCardView": "Card view",
+  "notesHomeCompactListView": "Compact list view",
+  "notesHomeFilterByTags": "Filter by tags",
+  "notesHomeTags": "Tags: {tags}",
+  "@notesHomeTags": {
+    "placeholders": {
+      "tags": {
+        "type": "String"
+      }
+    }
+  },
+  "notesHomeTrashIsEmpty": "Trash is empty",
+  "notesHomeNoMatchingNotesInTrash": "No matching notes in Trash",
+  "notesHomeNoNotesMatchThisView": "No notes match this view and filters",
+  "settingsBackingUpNow": "Backing up now...",
+  "settingsNoAutomaticBackupHasRun": "No automatic backup has run yet.",
+  "settingsLastBackup": "Last backup: {substring}",
+  "@settingsLastBackup": {
+    "placeholders": {
+      "substring": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsOffChooseAFolderTo": "Off. Choose a folder to save a complete backup about once a day.",
+  "settingsChooseFolder": "Choose folder",
+  "settingsBackupExportedKeepThisReadable": "Backup exported. Keep this readable file in a safe place.",
+  "settingsTextExportedUseAComplete": "Text exported. Use a complete backup to restore images and formatting.",
+  "settingsYourNotesCanSyncAcross": "Your notes can sync across devices.",
+  "settingsSignInWithGoogleTo": "Sign in with Google to sync your notes.",
+  "settingsGoogleSyncNeedsASupabase": "Google sync needs a Supabase project connection.",
+  "settingsAddsAWindowsScheduledTask": "Adds a Windows scheduled task (BetterNotes Reminders, this user only) that opens BetterNotes when a reminder is due or at sign-in. Best effort: a reminder missed while the PC was off is shown the next time the app starts. Turn off to remove the task.",
+  "settingsAGlobalShortcutThatOpens": "A global shortcut that opens a new note from any app while BetterNotes is running.",
+  "settingsAnotherAppAlreadyUsesThat": "Another app already uses that shortcut. Choose a different one.",
+  "settingsCouldNotSetTheShortcut": "Could not set the shortcut: {error}",
+  "@settingsCouldNotSetTheShortcut": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsCheckingWindowsStartupSetting": "Checking Windows startup setting",
+  "settingsCouldNotReadWindowsStartup2": "Could not read Windows startup setting",
+  "textColorEnterSixHexDigitsSuch": "Enter six hex digits, such as #795082.",
+  "versionHistoryThatVersionIsNoLonger": "That version is no longer available.",
+  "versionHistoryRestoredAsANewNote": "Restored as a new note: {displayTitle}",
+  "@versionHistoryRestoredAsANewNote": {
+    "placeholders": {
+      "displayTitle": {
+        "type": "String"
+      }
+    }
+  },
+  "viewNotes": "Notes",
+  "viewFavorites": "Favorites",
+  "viewReminders": "Reminders",
+  "viewArchive": "Archive",
+  "viewTrash": "Trash",
+  "bulkDoneMovedToTrash": "Moved to Trash",
+  "bulkDoneRemovedFavorite": "Removed favorite",
+  "bulkDoneColorChanged": "Color changed",
+  "bulkDoneTagsAdded": "Tags added",
+  "bulkDoneExported": "Exported",
+  "bulkDoneFavorited": "Favorited",
+  "bulkDoneArchived": "Archived"
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../data/note.dart';
 
 /// Edits a note's optional title and comma-separated tags. Returns null when
@@ -15,7 +16,7 @@ Future<({String title, String tags})?> showNoteDetailsDialog(
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Title and tags'),
+        title: Text(context.l10n.noteDetailsTitleAndTags),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -24,17 +25,17 @@ Future<({String title, String tags})?> showNoteDetailsDialog(
                 key: const ValueKey('note-title'),
                 controller: title,
                 maxLength: 200,
-                decoration: const InputDecoration(
-                  labelText: 'Title (optional)',
-                  hintText: 'Uses the first text line when blank',
+                decoration: InputDecoration(
+                  labelText: context.l10n.noteDetailsTitleOptional,
+                  hintText: context.l10n.noteDetailsUsesTheFirstTextLine,
                 ),
               ),
               TextField(
                 key: const ValueKey('note-tags'),
                 controller: tags,
-                decoration: const InputDecoration(
-                  labelText: 'Tags',
-                  hintText: 'work, ideas, personal',
+                decoration: InputDecoration(
+                  labelText: context.l10n.bulkTags,
+                  hintText: context.l10n.noteDetailsWorkIdeasPersonal,
                 ),
               ),
               if (suggestions.isNotEmpty)
@@ -85,11 +86,11 @@ Future<({String title, String tags})?> showNoteDetailsDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.bulkCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
+            child: Text(context.l10n.noteDetailsSave),
           ),
         ],
       ),

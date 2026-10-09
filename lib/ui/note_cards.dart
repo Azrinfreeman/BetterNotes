@@ -39,28 +39,31 @@ class EmptyState extends StatelessWidget {
           Text(
             message ??
                 (searching
-                    ? 'No matching notes'
-                    : 'A fresh space for your ideas'),
+                    ? context.l10n.noteNoMatchingNotes
+                    : context.l10n.noteAFreshSpaceForYour),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
             searching
-                ? 'Try another word or clear the search.'
+                ? context.l10n.noteTryAnotherWordOrClear
                 : message != null
-                ? 'Choose another view or reset filters to see your notes.'
-                : 'Keep a thought close. Start with a note.',
+                ? context.l10n.noteChooseAnotherViewOrReset
+                : context.l10n.noteKeepAThoughtCloseStart,
             textAlign: TextAlign.center,
           ),
           if (onReset != null)
-            TextButton(onPressed: onReset, child: const Text('Show all notes')),
+            TextButton(
+              onPressed: onReset,
+              child: Text(context.l10n.noteShowAllNotes),
+            ),
           if (!searching && message == null) ...[
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onCreate,
               icon: const Icon(Icons.add),
-              label: const Text('Create a note'),
+              label: Text(context.l10n.noteCreateANote),
             ),
           ],
         ],
@@ -79,18 +82,16 @@ class TrashCard extends StatelessWidget {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Permanently delete this note?'),
-          content: const Text(
-            'This cannot be undone. A previously exported backup will keep its copy.',
-          ),
+          title: Text(context.l10n.notePermanentlyDeleteThisNote),
+          content: Text(context.l10n.noteThisCannotBeUndoneA),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.bulkCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete permanently'),
+              child: Text(context.l10n.noteDeletePermanently),
             ),
           ],
         ),
@@ -107,7 +108,9 @@ class TrashCard extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              permanent ? 'Note permanently deleted' : 'Note restored to Notes',
+              permanent
+                  ? context.l10n.noteNotePermanentlyDeleted
+                  : context.l10n.noteNoteRestoredToNotes,
             ),
           ),
         );
@@ -130,8 +133,8 @@ class TrashCard extends StatelessWidget {
         children: [
           Text(
             note.deletedAt == null
-                ? 'In Trash'
-                : 'Deleted ${noteTime(note.deletedAt!)}',
+                ? context.l10n.noteInTrash
+                : context.l10n.noteDeleted(noteTime(note.deletedAt!)),
             style: Theme.of(context).textTheme.labelMedium,
           ),
           const SizedBox(height: 8),
@@ -148,12 +151,12 @@ class TrashCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => _command(context, false),
                 icon: const Icon(Icons.restore),
-                label: const Text('Restore'),
+                label: Text(context.l10n.noteRestore),
               ),
               IconButton(
                 tooltip: note.ownerId == guestOwner
-                    ? 'Delete permanently'
-                    : 'Account Trash retains sync records',
+                    ? context.l10n.noteDeletePermanently
+                    : context.l10n.noteAccountTrashRetainsSyncRecords,
                 onPressed: note.ownerId == guestOwner
                     ? () => _command(context, true)
                     : null,
@@ -200,19 +203,23 @@ class ArchiveCard extends StatelessWidget {
                 await controller.archive(note.id, archived: false);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Note restored from Archive')),
+                    SnackBar(
+                      content: Text(context.l10n.noteNoteRestoredFromArchive),
+                    ),
                   );
                 }
               } catch (error) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not restore: $error')),
+                    SnackBar(
+                      content: Text(context.l10n.noteCouldNotRestore('$error')),
+                    ),
                   );
                 }
               }
             },
             icon: const Icon(Icons.unarchive_outlined),
-            label: const Text('Restore from Archive'),
+            label: Text(context.l10n.noteRestoreFromArchive),
           ),
         ],
       ),
@@ -249,9 +256,11 @@ class CompactNoteTile extends StatelessWidget {
     ].join(' · ');
     return Semantics(
       container: true,
-      label:
-          '${note.displayTitle}. Updated ${noteTime(note.updatedAt)}. '
-          '${noteColorNames[note.colorIndex % noteColorNames.length]} note.',
+      label: context.l10n.noteUpdatedNote(
+        note.displayTitle,
+        noteTime(note.updatedAt),
+        noteColorNames[note.colorIndex % noteColorNames.length],
+      ),
       child: Card(
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
@@ -288,9 +297,13 @@ class CompactNoteTile extends StatelessWidget {
                 ),
               ),
               if (note.favorite)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(right: 12),
-                  child: Icon(Icons.star, size: 20, semanticLabel: 'Favorite'),
+                  child: Icon(
+                    Icons.star,
+                    size: 20,
+                    semanticLabel: context.l10n.noteFavorite,
+                  ),
                 ),
             ],
           ),
@@ -320,9 +333,12 @@ class NoteCard extends StatelessWidget {
         : note.plainText;
     return Semantics(
       container: true,
-      label:
-          '${note.displayTitle}. $preview. Updated ${noteTime(note.updatedAt)}. '
-          '${noteColorNames[note.colorIndex % noteColorNames.length]} note.',
+      label: context.l10n.noteUpdatedNote2(
+        note.displayTitle,
+        preview,
+        noteTime(note.updatedAt),
+        noteColorNames[note.colorIndex % noteColorNames.length],
+      ),
       child: Card(
         clipBehavior: Clip.antiAlias,
         color: dark ? Theme.of(context).colorScheme.surfaceContainerHigh : null,
@@ -350,7 +366,7 @@ class NoteCard extends StatelessWidget {
                       ),
                     ),
                     PopupMenuButton<int>(
-                      tooltip: 'Note options',
+                      tooltip: context.l10n.noteNoteOptions,
                       icon: const Icon(Icons.more_horiz),
                       onSelected: (value) async {
                         if (value == -2 || value == -3 || value == -4) {
@@ -369,7 +385,9 @@ class NoteCard extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'Could not update note: $error',
+                                    context.l10n.noteCouldNotUpdateNote(
+                                      '$error',
+                                    ),
                                   ),
                                 ),
                               );
@@ -387,19 +405,19 @@ class NoteCard extends StatelessWidget {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text('Delete this note?'),
-                              content: const Text(
-                                'Move this note to Trash? You can restore it later.',
+                              title: Text(context.l10n.noteDeleteThisNote),
+                              content: Text(
+                                context.l10n.noteMoveThisNoteToTrash,
                               ),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
                                       Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
+                                  child: Text(context.l10n.bulkCancel),
                                 ),
                                 FilledButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('Delete'),
+                                  child: Text(context.l10n.noteDelete),
                                 ),
                               ],
                             ),
@@ -414,7 +432,9 @@ class NoteCard extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Could not move to Trash: $error',
+                                  context.l10n.noteCouldNotMoveToTrash(
+                                    '$error',
+                                  ),
                                 ),
                               ),
                             );
@@ -425,16 +445,18 @@ class NoteCard extends StatelessWidget {
                         PopupMenuItem<int>(
                           value: -2,
                           child: Text(
-                            note.favorite ? 'Remove favorite' : 'Favorite',
+                            note.favorite
+                                ? context.l10n.notesHomeRemoveFavorite
+                                : 'Favorite',
                           ),
                         ),
-                        const PopupMenuItem<int>(
+                        PopupMenuItem<int>(
                           value: -4,
-                          child: Text('Duplicate note'),
+                          child: Text(context.l10n.noteDuplicateNote),
                         ),
-                        const PopupMenuItem<int>(
+                        PopupMenuItem<int>(
                           value: -3,
-                          child: Text('Archive note'),
+                          child: Text(context.l10n.noteArchiveNote),
                         ),
                         const PopupMenuDivider(),
                         for (var i = 0; i < noteColors.length; i++)
@@ -452,9 +474,9 @@ class NoteCard extends StatelessWidget {
                             ),
                           ),
                         const PopupMenuDivider(),
-                        const PopupMenuItem<int>(
+                        PopupMenuItem<int>(
                           value: -1,
-                          child: Text('Delete note'),
+                          child: Text(context.l10n.noteDeleteNote),
                         ),
                       ],
                     ),
@@ -466,12 +488,12 @@ class NoteCard extends StatelessWidget {
                 child: Row(
                   children: [
                     if (note.favorite)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(right: 4),
                         child: Icon(
                           Icons.star,
                           size: 16,
-                          semanticLabel: 'Favorite',
+                          semanticLabel: context.l10n.noteFavorite,
                         ),
                       ),
                     Expanded(
@@ -540,7 +562,7 @@ class NoteCard extends StatelessWidget {
   }
 }
 
-/// Date and time for reminders: "Today 9:00 AM", "Tomorrow 9:00 AM", "12 Oct 9:00 AM".
+/// Date and time for reminders: context.l10n.noteTodayAm, "Tomorrow 9:00 AM", "12 Oct 9:00 AM".
 String reminderTime(DateTime date) {
   final local = date.toLocal();
   final now = DateTime.now();
@@ -621,8 +643,11 @@ class _NoteImageState extends State<NoteImage> {
     future: _image,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(
-          child: Icon(Icons.image_outlined, semanticLabel: 'Loading image'),
+        return Center(
+          child: Icon(
+            Icons.image_outlined,
+            semanticLabel: context.l10n.noteLoadingImage,
+          ),
         );
       }
       if (!snapshot.hasData || snapshot.hasError) return _unavailableImage();
@@ -635,7 +660,7 @@ class _NoteImageState extends State<NoteImage> {
           cacheHeight: widget.thumbnail
               ? (72 * MediaQuery.devicePixelRatioOf(context)).ceil()
               : null,
-          semanticLabel: 'Attached note image',
+          semanticLabel: context.l10n.noteAttachedNoteImage,
           errorBuilder: (_, _, _) => _unavailableImage(),
         ),
       );
@@ -644,20 +669,23 @@ class _NoteImageState extends State<NoteImage> {
 
   Widget _unavailableImage() => Center(
     child: widget.thumbnail
-        ? const Tooltip(
-            message: 'Image unavailable. Open the note to retry or restore from a backup.',
+        ? Tooltip(
+            message: context.l10n.noteImageUnavailableOpenTheNote,
             child: Icon(
               Icons.broken_image_outlined,
-              semanticLabel: 'Image unavailable',
+              semanticLabel: context.l10n.noteImageUnavailable,
             ),
           )
         : SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Image unavailable', textAlign: TextAlign.center),
-                const Text(
-                  'Retry loading or restore a copy from a complete backup.',
+                Text(
+                  context.l10n.noteImageUnavailable,
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  context.l10n.noteRetryLoadingOrRestoreA,
                   textAlign: TextAlign.center,
                 ),
                 TextButton.icon(
@@ -668,7 +696,7 @@ class _NoteImageState extends State<NoteImage> {
                     );
                   }),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Retry image'),
+                  label: Text(context.l10n.noteRetryImage),
                 ),
               ],
             ),

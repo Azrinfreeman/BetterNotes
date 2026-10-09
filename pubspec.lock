@@ -950,7 +950,7 @@ packages:
     source: hosted
     version: "0.0.1"
   quill_native_bridge_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: quill_native_bridge_platform_interface
       sha256: "8264a2bdb8a294c31377a27b46c0f8717fa9f968cf113f7dc52d332ed9c84526"

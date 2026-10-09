@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
 import '../data/note.dart';
 import '../data/templates.dart';
 import '../desktop/window_chrome.dart';
@@ -59,26 +60,26 @@ class _NotesHomeState extends State<NotesHome> {
       final name = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Save this search'),
+          title: Text(context.l10n.notesHomeSaveThisSearch),
           content: TextField(
             key: const ValueKey('filter-name'),
             controller: field,
             autofocus: true,
             maxLength: 40,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              helperText: 'Keeps the search text, view, sort, and tags. Same name replaces.',
+            decoration: InputDecoration(
+              labelText: context.l10n.notesHomeName,
+              helperText: context.l10n.notesHomeKeepsTheSearchTextView,
             ),
             onSubmitted: (value) => Navigator.pop(context, value),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.bulkCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, field.text),
-              child: const Text('Save'),
+              child: Text(context.l10n.noteDetailsSave),
             ),
           ],
         ),
@@ -88,7 +89,9 @@ class _NotesHomeState extends State<NotesHome> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save search: $error')),
+          SnackBar(
+            content: Text(context.l10n.notesHomeCouldNotSaveSearch('$error')),
+          ),
         );
       }
     } finally {
@@ -118,13 +121,14 @@ class _NotesHomeState extends State<NotesHome> {
               avatar: const Icon(Icons.bookmark_outline, size: 18),
               onPressed: () => _applyFilter(filter),
               deleteIcon: const Icon(Icons.close, size: 18),
-              deleteButtonTooltipMessage: 'Delete saved search ${filter.name}',
+              deleteButtonTooltipMessage: context.l10n
+                  .notesHomeDeleteSavedSearch(filter.name),
               onDeleted: () => widget.controller.deleteFilter(filter.name),
             ),
           if (custom)
             ActionChip(
               avatar: const Icon(Icons.bookmark_add_outlined, size: 18),
-              label: const Text('Save search'),
+              label: Text(context.l10n.notesHomeSaveSearch),
               onPressed: _saveFilter,
             ),
         ],
@@ -158,7 +162,9 @@ class _NotesHomeState extends State<NotesHome> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save filters: $error')),
+          SnackBar(
+            content: Text(context.l10n.notesHomeCouldNotSaveFilters('$error')),
+          ),
         );
       }
     }
@@ -180,7 +186,7 @@ class _NotesHomeState extends State<NotesHome> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Match all selected tags',
+                    context.l10n.notesHomeMatchAllSelectedTags,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
@@ -220,16 +226,16 @@ class _NotesHomeState extends State<NotesHome> {
                             selected.retainAll(now);
                           });
                         },
-                        child: const Text('Manage tags'),
+                        child: Text(context.l10n.notesHomeManageTags),
                       ),
                       TextButton(
                         onPressed: () => refresh(selected.clear),
-                        child: const Text('Clear tags'),
+                        child: Text(context.l10n.notesHomeClearTags),
                       ),
                       FilledButton(
                         onPressed: () =>
                             Navigator.pop(context, selected.toList()),
-                        child: const Text('Apply'),
+                        child: Text(context.l10n.notesHomeApply),
                       ),
                     ],
                   ),
@@ -251,16 +257,18 @@ class _NotesHomeState extends State<NotesHome> {
     if (id == null || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Moved to Trash'),
+        content: Text(context.l10n.noteMovedToTrash),
         action: SnackBarAction(
-          label: 'Undo',
+          label: context.l10n.noteUndo,
           onPressed: () async {
             try {
               await controller.restore(id);
             } catch (error) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Could not restore: $error')),
+                  SnackBar(
+                    content: Text(context.l10n.noteCouldNotRestore('$error')),
+                  ),
                 );
               }
             }
@@ -300,12 +308,15 @@ class _NotesHomeState extends State<NotesHome> {
       final count = await action();
       if (!mounted) return;
       setState(_selected.clear);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$done: $count note(s).')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.notesHomeNoteS(done, '$count'))),
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update notes: $error')),
+          SnackBar(
+            content: Text(context.l10n.notesHomeCouldNotUpdateNotes('$error')),
+          ),
         );
       }
     }
@@ -317,23 +328,26 @@ class _NotesHomeState extends State<NotesHome> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Move ${ids.length} note(s) to Trash?'),
-          content: const Text('You can restore them from Trash later.'),
+          title: Text(context.l10n.notesHomeMoveNoteSToTrash('${ids.length}')),
+          content: Text(context.l10n.notesHomeYouCanRestoreThemFrom),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.bulkCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Move to Trash'),
+              child: Text(context.l10n.notesHomeMoveToTrash),
             ),
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (confirmed != true || !mounted) return;
     }
-    await _bulk(() => widget.controller.bulkTrash(ids), 'Moved to Trash');
+    await _bulk(
+      () => widget.controller.bulkTrash(ids),
+      context.l10n.bulkDoneMovedToTrash,
+    );
   }
 
   Future<void> _bulkMore(String choice) async {
@@ -351,14 +365,14 @@ class _NotesHomeState extends State<NotesHome> {
       case 'unfavorite':
         await _bulk(
           () => widget.controller.bulkFavorite(ids, false),
-          'Removed favorite',
+          context.l10n.bulkDoneRemovedFavorite,
         );
       case 'color':
         final color = await pickNoteColor(context);
         if (color != null && mounted) {
           await _bulk(
             () => widget.controller.bulkColor(ids, color),
-            'Color changed',
+            context.l10n.bulkDoneColorChanged,
           );
         }
       case 'tags':
@@ -369,58 +383,71 @@ class _NotesHomeState extends State<NotesHome> {
         if (tags != null && mounted) {
           await _bulk(
             () => widget.controller.bulkAddTags(ids, tags),
-            'Tags added',
+            context.l10n.bulkDoneTagsAdded,
           );
         }
       case 'export':
         await _bulk(() async {
-          final message = await exportNotesMarkdown(widget.controller, [
-            for (final id in ids)
-              if (widget.controller.noteById(id) case final Note note) note,
-          ]);
+          final message = await exportNotesMarkdown(
+            widget.controller,
+            context.l10n,
+            [
+              for (final id in ids)
+                if (widget.controller.noteById(id) case final Note note) note,
+            ],
+          );
           return message == null ? 0 : ids.length;
-        }, 'Exported');
+        }, context.l10n.bulkDoneExported);
     }
   }
 
   PreferredSizeWidget _selectionBar(BuildContext context) => AppBar(
     leading: IconButton(
-      tooltip: 'Clear selection',
+      tooltip: context.l10n.notesHomeClearSelection,
       icon: const Icon(Icons.close),
       onPressed: () => setState(_selected.clear),
     ),
-    title: Text('${_selected.length} selected'),
+    title: Text(context.l10n.notesHomeSelected('${_selected.length}')),
     actions: [
       IconButton(
-        tooltip: 'Favorite selected',
+        tooltip: context.l10n.notesHomeFavoriteSelected,
         icon: const Icon(Icons.star_outline),
         onPressed: () => _bulk(
           () => widget.controller.bulkFavorite(_selected.toList(), true),
-          'Favorited',
+          context.l10n.bulkDoneFavorited,
         ),
       ),
       IconButton(
-        tooltip: 'Archive selected',
+        tooltip: context.l10n.notesHomeArchiveSelected,
         icon: const Icon(Icons.archive_outlined),
         onPressed: () => _bulk(
           () => widget.controller.bulkArchive(_selected.toList()),
-          'Archived',
+          context.l10n.bulkDoneArchived,
         ),
       ),
       IconButton(
-        tooltip: 'Move selected to Trash',
+        tooltip: context.l10n.notesHomeMoveSelectedToTrash,
         icon: const Icon(Icons.delete_outline),
         onPressed: _bulkTrash,
       ),
       PopupMenuButton<String>(
-        tooltip: 'More selection actions',
+        tooltip: context.l10n.notesHomeMoreSelectionActions,
         onSelected: _bulkMore,
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'all', child: Text('Select all shown')),
-          PopupMenuItem(value: 'color', child: Text('Set color')),
-          PopupMenuItem(value: 'tags', child: Text('Add tags')),
-          PopupMenuItem(value: 'unfavorite', child: Text('Remove favorite')),
-          PopupMenuItem(value: 'export', child: Text('Export as Markdown')),
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'all',
+            child: Text(context.l10n.notesHomeSelectAllShown),
+          ),
+          PopupMenuItem(value: 'color', child: Text(context.l10n.bulkSetColor)),
+          PopupMenuItem(value: 'tags', child: Text(context.l10n.bulkAddTags)),
+          PopupMenuItem(
+            value: 'unfavorite',
+            child: Text(context.l10n.notesHomeRemoveFavorite),
+          ),
+          PopupMenuItem(
+            value: 'export',
+            child: Text(context.l10n.noteExportAsMarkdown),
+          ),
         ],
       ),
       const WindowButtons(),
@@ -475,7 +502,7 @@ class _NotesHomeState extends State<NotesHome> {
                 child: Icon(
                   Icons.check_circle,
                   color: primary,
-                  semanticLabel: 'Selected',
+                  semanticLabel: context.l10n.notesHomeSelected2,
                 ),
               ),
             ),
@@ -498,7 +525,9 @@ class _NotesHomeState extends State<NotesHome> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create note: $error')),
+          SnackBar(
+            content: Text(context.l10n.notesHomeCouldNotCreateNote('$error')),
+          ),
         );
       }
     } finally {
@@ -525,9 +554,11 @@ class _NotesHomeState extends State<NotesHome> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not open note: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.notesHomeCouldNotOpenNote('$error')),
+          ),
+        );
       }
     } finally {
       _openingNotes.remove(noteId);
@@ -559,9 +590,9 @@ class _NotesHomeState extends State<NotesHome> {
         appBar: _selecting
             ? _selectionBar(context)
             : AppBar(
-                title: const WindowTitle(
+                title: WindowTitle(
                   child: Text(
-                    'BetterNotes',
+                    context.l10n.windowChromeBetternotes,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.w800),
@@ -573,9 +604,9 @@ class _NotesHomeState extends State<NotesHome> {
                     builder: (context, _) => IconButton(
                       tooltip: widget.controller.syncError == null
                           ? widget.controller.signedIn
-                                ? 'Sync notes'
-                                : 'Local notes'
-                          : 'Sync needs attention',
+                                ? context.l10n.notesHomeSyncNotes
+                                : context.l10n.notesHomeLocalNotes
+                          : context.l10n.settingsSyncNeedsAttention,
                       icon: Icon(
                         widget.controller.syncError != null
                             ? Icons.cloud_off_outlined
@@ -591,7 +622,7 @@ class _NotesHomeState extends State<NotesHome> {
                     ),
                   ),
                   PopupMenuButton<NoteTemplate>(
-                    tooltip: 'New note from template',
+                    tooltip: context.l10n.notesHomeNewNoteFromTemplate,
                     icon: const Icon(Icons.note_add_outlined),
                     enabled: !_creating,
                     onSelected: _newNote,
@@ -604,7 +635,7 @@ class _NotesHomeState extends State<NotesHome> {
                     ],
                   ),
                   IconButton(
-                    tooltip: 'Settings',
+                    tooltip: context.l10n.notesHomeSettings,
                     icon: const Icon(Icons.settings_outlined),
                     onPressed: _openSettings,
                   ),
@@ -621,7 +652,7 @@ class _NotesHomeState extends State<NotesHome> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.add),
-          label: const Text('New note'),
+          label: Text(context.l10n.noteDesktopHeaderNewNote),
         ),
         body: SafeArea(
           child: Center(
@@ -646,13 +677,19 @@ class _NotesHomeState extends State<NotesHome> {
                                   scrollDirection: Axis.horizontal,
                                   child: Row(
                                     children: [
-                                      for (final entry in const {
-                                        LibraryView.notes: 'Notes',
-                                        LibraryView.favorites: 'Favorites',
-                                        LibraryView.reminders: 'Reminders',
-                                        LibraryView.archive: 'Archive',
-                                        LibraryView.trash: 'Trash',
-                                        LibraryView.allActive: 'All active',
+                                      for (final entry in {
+                                        LibraryView.notes:
+                                            context.l10n.viewNotes,
+                                        LibraryView.favorites:
+                                            context.l10n.viewFavorites,
+                                        LibraryView.reminders:
+                                            context.l10n.viewReminders,
+                                        LibraryView.archive:
+                                            context.l10n.viewArchive,
+                                        LibraryView.trash:
+                                            context.l10n.viewTrash,
+                                        LibraryView.allActive:
+                                            context.l10n.notesHomeAllActive,
                                       }.entries)
                                         Padding(
                                           padding: const EdgeInsets.only(
@@ -688,11 +725,13 @@ class _NotesHomeState extends State<NotesHome> {
                                           isExpanded: true,
                                           onChanged: (sort) =>
                                               _options(sort: sort),
-                                          items: const [
+                                          items: [
                                             DropdownMenuItem(
                                               value: NoteSort.updated,
                                               child: Text(
-                                                'Recently edited',
+                                                context
+                                                    .l10n
+                                                    .notesHomeRecentlyEdited,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -700,7 +739,9 @@ class _NotesHomeState extends State<NotesHome> {
                                             DropdownMenuItem(
                                               value: NoteSort.created,
                                               child: Text(
-                                                'Newest created',
+                                                context
+                                                    .l10n
+                                                    .notesHomeNewestCreated,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -708,7 +749,7 @@ class _NotesHomeState extends State<NotesHome> {
                                             DropdownMenuItem(
                                               value: NoteSort.title,
                                               child: Text(
-                                                'Title A–Z',
+                                                context.l10n.notesHomeTitleAZ,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -721,12 +762,16 @@ class _NotesHomeState extends State<NotesHome> {
                                           _search.clear();
                                           _options(reset: true);
                                         },
-                                        child: const Text('Reset filters'),
+                                        child: Text(
+                                          context.l10n.notesHomeResetFilters,
+                                        ),
                                       ),
                                       IconButton(
                                         tooltip: widget.controller.compactView
-                                            ? 'Card view'
-                                            : 'Compact list view',
+                                            ? context.l10n.notesHomeCardView
+                                            : context
+                                                  .l10n
+                                                  .notesHomeCompactListView,
                                         icon: Icon(
                                           widget.controller.compactView
                                               ? Icons.grid_view_outlined
@@ -753,8 +798,11 @@ class _NotesHomeState extends State<NotesHome> {
                                       icon: const Icon(Icons.label_outline),
                                       label: Text(
                                         widget.controller.selectedTags.isEmpty
-                                            ? 'Filter by tags'
-                                            : 'Tags: ${widget.controller.selectedTags.join(', ')}',
+                                            ? context.l10n.notesHomeFilterByTags
+                                            : context.l10n.notesHomeTags(
+                                                widget.controller.selectedTags
+                                                    .join(', '),
+                                              ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -781,7 +829,9 @@ class _NotesHomeState extends State<NotesHome> {
                                       ),
                                       trailing: TextButton(
                                         onPressed: _openSettings,
-                                        child: const Text('Settings'),
+                                        child: Text(
+                                          context.l10n.notesHomeSettings,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -809,7 +859,7 @@ class _NotesHomeState extends State<NotesHome> {
                                             );
                                           }
                                         },
-                                        child: const Text('Retry'),
+                                        child: Text(context.l10n.noteRetry),
                                       ),
                                     ),
                                   ),
@@ -820,12 +870,14 @@ class _NotesHomeState extends State<NotesHome> {
                             focusNode: _searchFocus,
                             onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
-                              hintText: 'Search titles and text in this view',
+                              hintText:
+                                  context.l10n.notesHomeSearchTitlesAndTextIn,
                               prefixIcon: const Icon(Icons.search),
                               suffixIcon: _search.text.isEmpty
                                   ? null
                                   : IconButton(
-                                      tooltip: 'Clear search',
+                                      tooltip:
+                                          context.l10n.notesHomeClearSearch,
                                       icon: const Icon(Icons.close),
                                       onPressed: () {
                                         _search.clear();
@@ -840,8 +892,10 @@ class _NotesHomeState extends State<NotesHome> {
                             TextButton(
                               onPressed: () =>
                                   _options(view: LibraryView.allActive),
-                              child: const Text(
-                                'Search all active notes, including Archive',
+                              child: Text(
+                                context
+                                    .l10n
+                                    .notesHomeSearchAllActiveNotesIncluding,
                               ),
                             ),
                           const SizedBox(height: 18),
@@ -863,15 +917,17 @@ class _NotesHomeState extends State<NotesHome> {
                               onCreate: _newNote,
                               message: showTrash
                                   ? query.isEmpty
-                                        ? 'Trash is empty'
-                                        : 'No matching notes in Trash'
+                                        ? context.l10n.notesHomeTrashIsEmpty
+                                        : context
+                                              .l10n
+                                              .notesHomeNoMatchingNotesInTrash
                                   : widget.controller.libraryView !=
                                             LibraryView.notes ||
                                         widget
                                             .controller
                                             .selectedTags
                                             .isNotEmpty
-                                  ? 'No notes match this view and filters'
+                                  ? context.l10n.notesHomeNoNotesMatchThisView
                                   : null,
                               onReset:
                                   query.isNotEmpty ||

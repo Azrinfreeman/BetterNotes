@@ -66,7 +66,7 @@ class _ReminderDialog extends StatelessWidget {
       );
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not set the reminder: $error')),
+        SnackBar(content: Text(l10n.reminderCouldNotSetTheReminder('$error'))),
       );
     }
   }
@@ -177,7 +177,11 @@ class ReminderBanner extends StatelessWidget {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update the reminder: $error')),
+          SnackBar(
+            content: Text(
+              context.l10n.reminderCouldNotUpdateTheReminder('$error'),
+            ),
+          ),
         );
       }
     }

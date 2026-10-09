@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../data/backup_files.dart' as backup_files;
 import '../data/markdown_export.dart';
 import '../data/note.dart';
@@ -8,7 +9,7 @@ import '../state/notes_controller.dart';
 Future<int?> pickNoteColor(BuildContext context) => showDialog<int>(
   context: context,
   builder: (context) => AlertDialog(
-    title: const Text('Set color'),
+    title: Text(context.l10n.bulkSetColor),
     content: SingleChildScrollView(
       child: Wrap(
         spacing: 10,
@@ -37,7 +38,7 @@ Future<int?> pickNoteColor(BuildContext context) => showDialog<int>(
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(context.l10n.bulkCancel),
       ),
     ],
   ),
@@ -53,7 +54,7 @@ Future<List<String>?> askTagsToAdd(
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add tags'),
+        title: Text(context.l10n.bulkAddTags),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -62,9 +63,9 @@ Future<List<String>?> askTagsToAdd(
                 key: const ValueKey('bulk-tags'),
                 controller: field,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Tags',
-                  hintText: 'work, ideas',
+                decoration: InputDecoration(
+                  labelText: context.l10n.bulkTags,
+                  hintText: context.l10n.bulkWorkIdeas,
                 ),
               ),
               const SizedBox(height: 8),
@@ -92,11 +93,11 @@ Future<List<String>?> askTagsToAdd(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.bulkCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Add'),
+            child: Text(context.l10n.bulkAdd),
           ),
         ],
       ),
@@ -114,6 +115,7 @@ Future<List<String>?> askTagsToAdd(
 /// Returns a status message, or null when the save dialog was cancelled.
 Future<String?> exportNotesMarkdown(
   NotesController controller,
+  AppLocalizations l10n,
   List<Note> notes,
 ) async {
   await controller.flushAllEditors();
@@ -128,5 +130,5 @@ Future<String?> exportNotesMarkdown(
     file.name,
     mimeType: file.mimeType,
   );
-  return saved ? 'Exported ${fresh.length} note(s) as Markdown.' : null;
+  return saved ? l10n.bulkExportedNoteSAsMarkdown('${fresh.length}') : null;
 }

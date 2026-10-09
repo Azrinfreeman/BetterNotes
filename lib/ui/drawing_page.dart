@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../data/note.dart';
 
 class InkPreview extends StatelessWidget {
@@ -94,18 +95,18 @@ class _DrawingPageState extends State<DrawingPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Draw on note'),
+      title: Text(context.l10n.drawingDrawOnNote),
       actions: [
         TextButton(
           onPressed: () => setState(() {
             _active = null;
             _strokes = [];
           }),
-          child: const Text('Clear'),
+          child: Text(context.l10n.drawingClear),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, _strokes),
-          child: const Text('Done'),
+          child: Text(context.l10n.reminderDone),
         ),
       ],
     ),

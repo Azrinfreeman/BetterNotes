@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
+import '../l10n/l10n.dart';
 import '../state/note_editor_store.dart';
 import 'notes_home.dart';
 
@@ -92,7 +93,7 @@ class NoteImageCard extends StatelessWidget {
           right: 5,
           top: 5,
           child: IconButton.filledTonal(
-            tooltip: 'Remove image',
+            tooltip: context.l10n.noteImageEmbedRemoveImage,
             icon: const Icon(Icons.close),
             onPressed: onRemove,
           ),
