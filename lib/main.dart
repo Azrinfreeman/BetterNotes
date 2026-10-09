@@ -89,6 +89,10 @@ Future<void> _launchMain(
     );
     return;
   }
+  if (arguments.contains('--reminders-due')) {
+    // Started by the reminders scheduled task: leave quietly if nothing is due.
+    await windows.quitIfNoRemindersDue(controller);
+  }
   await windows.bindMain(controller);
   runApp(
     BetterNotesApp(

@@ -15,7 +15,7 @@ import '../data/revision.dart';
 import '../data/templates.dart';
 import 'note_editor_store.dart';
 
-enum LibraryView { notes, favorites, archive, trash, allActive }
+enum LibraryView { notes, favorites, archive, trash, allActive, reminders }
 
 enum NoteSort { updated, created, title }
 
@@ -148,6 +148,11 @@ class NotesController extends NoteEditorStore {
       LibraryView.archive => archiveNotes,
       LibraryView.trash => trash,
       LibraryView.allActive => _notes.where((note) => !note.deleted).toList(),
+      LibraryView.reminders => [
+        for (final note in _notes)
+          if (!note.deleted && note.archivedAt == null && note.remindAt != null)
+            note,
+      ],
     };
     final results = collection
         .where(
@@ -157,6 +162,11 @@ class NotesController extends NoteEditorStore {
         )
         .toList();
     results.sort((a, b) {
+      if (libraryView == LibraryView.reminders) {
+        // Upcoming first, then reminders that already fired.
+        if (a.reminderFired != b.reminderFired) return a.reminderFired ? 1 : -1;
+        return a.remindAt!.compareTo(b.remindAt!);
+      }
       if (libraryView != LibraryView.trash && a.favorite != b.favorite) {
         return a.favorite ? -1 : 1;
       }
@@ -217,6 +227,19 @@ class NotesController extends NoteEditorStore {
     _archiveCache = null;
     _libraryCache = null;
     _tagsCache = null;
+  }
+
+  /// Like [_replace] for local-only metadata: no cloud sync is scheduled.
+  void _replaceQuietly(Note note) {
+    final index = _notes.indexWhere((value) => value.id == note.id);
+    if (index < 0) return;
+    _notes[index] = note;
+    _byId[note.id] = note;
+    _activeCache = null;
+    _trashCache = null;
+    _archiveCache = null;
+    _libraryCache = null;
+    notifyListeners();
   }
 
   void _replace(Note note) {
@@ -281,6 +304,12 @@ class NotesController extends NoteEditorStore {
   bool fastNoteOpening = true;
   Future<void> Function()? applyFastNoteOpening;
   Future<void> Function()? applyTray;
+
+  /// Called after reminders change so the desktop shell can refresh its
+  /// scheduled task. Failures never block the change itself.
+  Future<void> Function()? remindersChanged;
+  bool reminderTaskEnabled = false;
+  String? reminderTaskError;
   Future<void> Function()? applyQuickCapture;
   bool keepInTray = false;
   String quickCaptureKey = 'off';
@@ -347,6 +376,7 @@ class NotesController extends NoteEditorStore {
     if (signedIn) await store.moveGuestNotes(ownerId);
     trashRetentionDays = await store.getSetting<int>('trashRetentionDays') ?? 0;
     keepInTray = await store.getSetting<bool>('keepInTray') ?? false;
+    reminderTaskEnabled = await store.getSetting<bool>('reminderTask') ?? false;
     quickCaptureKey =
         await store.getSetting<String>('quickCaptureKey') ?? 'off';
     autoBackupFolder = await store.getSetting<String>('autoBackupFolder');
@@ -827,6 +857,81 @@ class NotesController extends NoteEditorStore {
       autoBackupRunning = false;
       notifyListeners();
     }
+  }
+
+  /// Reminders that are due now and have not been shown yet.
+  List<Note> dueReminders([DateTime? now]) {
+    final at = (now ?? DateTime.now()).toUtc();
+    return [
+      for (final note in _notes)
+        if (note.ownerId == ownerId && note.reminderDue(at)) note,
+    ]..sort((a, b) => a.remindAt!.compareTo(b.remindAt!));
+  }
+
+  /// The earliest reminder that has not been shown yet.
+  DateTime? get nextReminder {
+    DateTime? next;
+    for (final note in _notes) {
+      if (note.ownerId != ownerId ||
+          note.deleted ||
+          note.archivedAt != null ||
+          !note.reminderPending) {
+        continue;
+      }
+      if (next == null || note.remindAt!.isBefore(next)) next = note.remindAt;
+    }
+    return next;
+  }
+
+  /// Sets, moves (snooze), or clears ([at] null) a note's reminder.
+  @override
+  Future<void> setReminder(String id, DateTime? at) async {
+    await _enqueue(() async {
+      final current = noteById(id);
+      if (current == null || current.ownerId != ownerId) return;
+      final changed = at == null
+          ? current.copyWith(clearReminder: true)
+          : current.copyWith(remindAt: at.toUtc(), reminderFired: false);
+      await store.putNote(changed.copyWith(dirty: current.dirty));
+      _replaceQuietly(changed.copyWith(dirty: current.dirty));
+    });
+    unawaited(_notifyRemindersChanged());
+  }
+
+  /// Marks a due reminder as shown so it is not announced twice.
+  Future<void> markReminderFired(String id) async {
+    await _enqueue(() async {
+      final current = noteById(id);
+      if (current == null || !current.reminderPending) return;
+      final changed = current.copyWith(reminderFired: true);
+      await store.putNote(changed);
+      _replaceQuietly(changed);
+    });
+    unawaited(_notifyRemindersChanged());
+  }
+
+  Future<void> _notifyRemindersChanged() async {
+    try {
+      await remindersChanged?.call();
+    } catch (_) {
+      // The scheduled task is best effort; the in-app check still works.
+    }
+  }
+
+  Future<void> setReminderTaskEnabled(bool value) async {
+    final previous = reminderTaskEnabled;
+    reminderTaskEnabled = value;
+    reminderTaskError = null;
+    try {
+      await store.setSetting('reminderTask', value);
+      await remindersChanged?.call();
+    } catch (error) {
+      reminderTaskEnabled = previous;
+      await store.setSetting('reminderTask', previous);
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
   }
 
   Future<void> setKeepInTray(bool value) async {

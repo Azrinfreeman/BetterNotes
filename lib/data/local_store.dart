@@ -117,6 +117,9 @@ class LocalStore {
               favorite: current.favorite,
               tags: current.tags,
               archivedAt: current.archivedAt,
+              remindAt: current.remindAt,
+              reminderFired: current.reminderFired,
+              clearReminder: current.remindAt == null,
             );
       await _notes.record(snapshot.id).put(txn, acknowledged.toJson());
     });

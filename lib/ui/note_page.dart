@@ -22,6 +22,7 @@ import 'find_bar.dart';
 import 'note_desktop_header.dart';
 import 'note_details_dialog.dart';
 import 'note_image_embed.dart';
+import 'reminder_dialog.dart';
 import 'shortcuts_help.dart';
 import 'version_history.dart';
 import 'text_color_dialog.dart';
@@ -265,6 +266,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       _openFind();
       return;
     }
+    if (value == 'reminder') {
+      await showReminderDialog(context, widget.controller, note);
+      return;
+    }
     if (value == 'history') {
       await showVersionHistory(context, widget.controller, note);
       return;
@@ -329,6 +334,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       child: Text(note.favorite ? 'Remove favorite' : 'Favorite'),
     ),
     const PopupMenuItem(value: 'duplicate', child: Text('Duplicate note')),
+    PopupMenuItem(
+      value: 'reminder',
+      child: Text(note.remindAt == null ? 'Set reminder…' : 'Edit reminder…'),
+    ),
     const PopupMenuItem(value: 'history', child: Text('Version history')),
     const PopupMenuItem(value: 'markdown', child: Text('Export as Markdown')),
     const PopupMenuItem(value: 'pdf', child: Text('Export as PDF (to print)')),
@@ -922,6 +931,20 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                       constraints: const BoxConstraints(maxWidth: 790),
                       child: Column(
                         children: [
+                          if (widget.controller case final store
+                              when store
+                                          .noteById(widget.noteId)
+                                          ?.reminderFired ==
+                                      true &&
+                                  store.noteById(widget.noteId)?.remindAt !=
+                                      null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                              child: ReminderBanner(
+                                store: store,
+                                note: store.noteById(widget.noteId)!,
+                              ),
+                            ),
                           if (_finding)
                             FindBar(
                               textController: _findText,

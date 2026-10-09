@@ -65,13 +65,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const bool new_note =
       std::find(command_line_arguments.begin(), command_line_arguments.end(),
                 "--new-note") != command_line_arguments.end();
+  const bool reminders_due =
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--reminders-due") != command_line_arguments.end();
   HWND existing =
       FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"better_notes");
   if (existing != nullptr) {
     DWORD_PTR ignored = 0;
     const LRESULT delivered =
         SendMessageTimeoutW(existing, kBetterNotesActivateMessage,
-                            new_note ? 1 : 0, 0, SMTO_ABORTIFHUNG, 3000,
+                            reminders_due ? 2 : (new_note ? 1 : 0), 0,
+                            SMTO_ABORTIFHUNG, 3000,
                             &ignored);
     ::CoUninitialize();
     return delivered != 0 ? EXIT_SUCCESS : EXIT_FAILURE;

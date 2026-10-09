@@ -35,6 +35,8 @@ abstract class NoteEditorStore extends ChangeNotifier {
   Future<void> archive(String id, {bool archived = true}) async =>
       throw UnsupportedError('Archive unavailable.');
   List<String> get availableTags => const [];
+  Future<void> setReminder(String id, DateTime? at) async =>
+      throw UnsupportedError('Reminders unavailable.');
   Future<List<NoteRevision>> revisions(String noteId) async => const [];
   Future<Note?> restoreRevision(String revisionId) async =>
       throw UnsupportedError('Version history unavailable.');

@@ -144,6 +144,14 @@ class RemoteNoteEditorStore extends NoteEditorStore {
   );
 
   @override
+  Future<void> setReminder(String id, DateTime? at) => _applyResponse(
+    _parent.invokeMethod<Map<dynamic, dynamic>>('set_reminder', {
+      'noteId': id,
+      'at': at?.toUtc().toIso8601String(),
+    }),
+  );
+
+  @override
   Future<List<NoteRevision>> revisions(String noteId) async {
     final raw = await _parent.invokeMethod<List<dynamic>>(
       'note_revisions',

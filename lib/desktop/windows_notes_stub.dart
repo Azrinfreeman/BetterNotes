@@ -21,4 +21,5 @@ class DesktopCoordinator {
       throw UnsupportedError('Desktop note windows are unavailable.');
   Future<void> closeSelf() async {}
   Future<void> notifyReady() async {}
+  Future<void> quitIfNoRemindersDue(NotesController controller) async {}
 }

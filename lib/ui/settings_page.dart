@@ -451,6 +451,38 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             SwitchListTile(
+              key: const ValueKey('reminder-task'),
+              secondary: const Icon(Icons.alarm_outlined),
+              title: const Text('Remind me when BetterNotes is closed'),
+              subtitle: Text(
+                widget.controller.reminderTaskError ??
+                    'Adds a Windows scheduled task (BetterNotes Reminders, '
+                        'this user only) that opens BetterNotes when a '
+                        'reminder is due or at sign-in. Best effort: a '
+                        'reminder missed while the PC was off is shown the '
+                        'next time the app starts. Turn off to remove the task.',
+                style: widget.controller.reminderTaskError == null
+                    ? null
+                    : TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              value: widget.controller.reminderTaskEnabled,
+              onChanged: (value) async {
+                try {
+                  await widget.controller.setReminderTaskEnabled(value);
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Could not update the scheduled task: $error',
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            SwitchListTile(
               key: const ValueKey('keep-in-tray'),
               secondary: const Icon(Icons.dock_outlined),
               title: const Text('Keep running in the system tray'),

@@ -7,6 +7,7 @@
 #include <flutter/method_channel.h>
 
 #include <memory>
+#include <string>
 
 #include "win32_window.h"
 
@@ -36,6 +37,9 @@ class FlutterWindow : public Win32Window {
   bool SetTrayVisible(bool visible);
   void ShowTrayMenu();
   void ShowMainWindow();
+  bool ShowBalloon(const std::wstring& title, const std::wstring& text);
+  void RemoveTemporaryTray();
+  bool tray_temporary_ = false;
   DWORD SetQuickCaptureHotkey(bool enabled, UINT modifiers, UINT key);
   bool tray_visible_ = false;
   bool hotkey_registered_ = false;
