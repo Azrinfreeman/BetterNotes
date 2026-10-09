@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/l10n.dart';
+
 /// Applies the native frame style and shares controls with route app bars.
 class WindowChrome extends StatefulWidget {
   const WindowChrome({
@@ -68,7 +70,11 @@ class _WindowChromeState extends State<WindowChrome> with WindowListener {
       } catch (error) {
         if (mounted) {
           ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text('Could not change window buttons: $error')),
+            SnackBar(
+              content: Text(
+                context.l10n.windowChromeCouldNotChangeWindowButtons('$error'),
+              ),
+            ),
           );
         }
       }
@@ -127,12 +133,12 @@ class _WindowChromeState extends State<WindowChrome> with WindowListener {
                       onPanStart: (_) =>
                           unawaited(windowManager.startDragging()),
                       onDoubleTap: _toggleMaximize,
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'BetterNotes',
+                            context.l10n.windowChromeBetternotes,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -141,7 +147,7 @@ class _WindowChromeState extends State<WindowChrome> with WindowListener {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Minimize',
+                    tooltip: context.l10n.windowChromeMinimize,
                     onPressed: windowManager.minimize,
                     icon: const Icon(Icons.remove),
                   ),
@@ -155,7 +161,7 @@ class _WindowChromeState extends State<WindowChrome> with WindowListener {
                   Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: IconButton.filledTonal(
-                      tooltip: 'Close window',
+                      tooltip: context.l10n.windowChromeCloseWindow,
                       style: IconButton.styleFrom(
                         foregroundColor: colors.onErrorContainer,
                         backgroundColor: colors.errorContainer,
@@ -240,7 +246,7 @@ class WindowButtons extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          tooltip: 'Minimize',
+          tooltip: context.l10n.windowChromeMinimize,
           onPressed: windowManager.minimize,
           icon: const Icon(Icons.remove),
         ),
@@ -252,7 +258,7 @@ class WindowButtons extends StatelessWidget {
           ),
         ),
         IconButton.filledTonal(
-          tooltip: 'Close window',
+          tooltip: context.l10n.windowChromeCloseWindow,
           style: IconButton.styleFrom(
             foregroundColor: colors.onErrorContainer,
             backgroundColor: colors.errorContainer,

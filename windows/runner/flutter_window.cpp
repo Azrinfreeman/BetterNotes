@@ -285,6 +285,13 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == kBetterNotesActivateMessage && wparam == 3) {
+    // Asked to quit (installer upgrade or uninstall): Dart saves and exits.
+    if (commands_ready_ && command_channel_) {
+      command_channel_->InvokeMethod("quit", nullptr);
+    }
+    return 0;
+  }
   if (message == kBetterNotesActivateMessage && wparam == 2) {
     // A scheduled-task launch while we are already running: just re-check
     // reminders, without bringing any window forward.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../state/notes_controller.dart';
 
 /// Lists every tag with its note count; rename (merging into an existing tag
@@ -15,11 +16,11 @@ Future<void> showTagManager(
       final counts = controller.tagCounts;
       final tags = counts.keys.toList()..sort();
       return AlertDialog(
-        title: const Text('Manage tags'),
+        title: Text(context.l10n.notesHomeManageTags),
         content: SizedBox(
           width: 360,
           child: tags.isEmpty
-              ? const Text('No tags yet. Add tags from a note’s menu.')
+              ? Text(context.l10n.tagManagerNoTagsYetAddTags)
               : ListView(
                   shrinkWrap: true,
                   children: [
@@ -33,13 +34,15 @@ Future<void> showTagManager(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: 'Rename or merge $tag',
+                              tooltip: context.l10n.tagManagerRenameOrMerge(
+                                tag,
+                              ),
                               icon: const Icon(Icons.edit_outlined),
                               onPressed: () =>
                                   _rename(context, controller, tag),
                             ),
                             IconButton(
-                              tooltip: 'Delete tag $tag',
+                              tooltip: context.l10n.tagManagerDeleteTag3(tag),
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () =>
                                   _delete(context, controller, tag),
@@ -53,7 +56,7 @@ Future<void> showTagManager(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
+            child: Text(context.l10n.reminderDone),
           ),
         ],
       );
@@ -62,8 +65,11 @@ Future<void> showTagManager(
 );
 
 void _report(BuildContext context, Object error) =>
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Could not change tag: $error')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.tagManagerCouldNotChangeTag('$error')),
+      ),
+    );
 
 Future<void> _rename(
   BuildContext context,
@@ -75,24 +81,24 @@ Future<void> _rename(
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Rename “$tag”'),
+        title: Text(context.l10n.tagManagerRename(tag)),
         content: TextField(
           key: const ValueKey('tag-rename'),
           controller: field,
           autofocus: true,
-          decoration: const InputDecoration(
-            helperText: 'Using an existing tag name merges the two.',
+          decoration: InputDecoration(
+            helperText: context.l10n.tagManagerUsingAnExistingTagName,
           ),
           onSubmitted: (value) => Navigator.pop(context, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.bulkCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, field.text),
-            child: const Text('Rename'),
+            child: Text(context.l10n.tagManagerRename2),
           ),
         ],
       ),
@@ -115,16 +121,16 @@ Future<void> _delete(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Delete tag “$tag”?'),
-      content: const Text('The tag is removed from every note. Notes stay.'),
+      title: Text(context.l10n.tagManagerDeleteTag(tag)),
+      content: Text(context.l10n.tagManagerTheTagIsRemovedFrom),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.bulkCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete tag'),
+          child: Text(context.l10n.tagManagerDeleteTag2),
         ),
       ],
     ),

@@ -11,6 +11,7 @@ import 'package:pasteboard/pasteboard.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/l10n.dart';
 import '../data/clipboard_image.dart';
 import '../data/backup_files.dart' show saveBackupFile;
 import '../data/markdown_export.dart';
@@ -133,7 +134,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       final pinned = await windowManager.isAlwaysOnTop();
       if (mounted) setState(() => _alwaysOnTop = pinned);
     } catch (error) {
-      if (mounted) _message('Could not read always on top: $error');
+      if (mounted) _message(context.l10n.noteCouldNotReadAlwaysOn('$error'));
     }
   }
 
@@ -143,7 +144,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       await windowManager.setAlwaysOnTop(pinned);
       if (mounted) setState(() => _alwaysOnTop = pinned);
     } catch (error) {
-      if (mounted) _message('Could not change always on top: $error');
+      if (mounted) _message(context.l10n.noteCouldNotChangeAlwaysOn('$error'));
     }
   }
 
@@ -249,7 +250,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         );
       }
     } catch (error) {
-      if (mounted) _message('Could not save details: $error');
+      if (mounted) _message(context.l10n.noteCouldNotSaveDetails('$error'));
     }
   }
 
@@ -286,9 +287,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
           file.name,
           mimeType: file.mimeType,
         );
-        if (saved && mounted) _message('Exported "${file.name}".');
+        if (saved && mounted) _message(context.l10n.noteExported(file.name));
       } catch (error) {
-        if (mounted) _message('Could not export: $error');
+        if (mounted) _message(context.l10n.noteCouldNotExport('$error'));
       }
       return;
     }
@@ -296,10 +297,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       try {
         final copy = await widget.controller.duplicate(note.id);
         if (copy != null && mounted) {
-          _message('Duplicated as "${copy.displayTitle}".');
+          _message(context.l10n.noteDuplicatedAs(copy.displayTitle));
         }
       } catch (error) {
-        if (mounted) _message('Could not duplicate note: $error');
+        if (mounted) _message(context.l10n.noteCouldNotDuplicateNote('$error'));
       }
       return;
     }
@@ -317,7 +318,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         await _close();
       }
     } catch (error) {
-      if (mounted) _message('Could not update note: $error');
+      if (mounted) _message(context.l10n.noteCouldNotUpdateNote('$error'));
     }
   }
 
@@ -328,22 +329,46 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       child: Text(_statsLabel(), style: Theme.of(context).textTheme.bodySmall),
     ),
     const PopupMenuDivider(),
-    const PopupMenuItem(value: 'details', child: Text('Title and tags')),
+    PopupMenuItem(
+      value: 'details',
+      child: Text(context.l10n.noteDetailsTitleAndTags),
+    ),
     PopupMenuItem(
       value: 'favorite',
-      child: Text(note.favorite ? 'Remove favorite' : 'Favorite'),
+      child: Text(
+        note.favorite ? context.l10n.notesHomeRemoveFavorite : 'Favorite',
+      ),
     ),
-    const PopupMenuItem(value: 'duplicate', child: Text('Duplicate note')),
+    PopupMenuItem(
+      value: 'duplicate',
+      child: Text(context.l10n.noteDuplicateNote),
+    ),
     PopupMenuItem(
       value: 'reminder',
-      child: Text(note.remindAt == null ? 'Set reminder…' : 'Edit reminder…'),
+      child: Text(
+        note.remindAt == null
+            ? context.l10n.noteSetReminder
+            : context.l10n.noteEditReminder,
+      ),
     ),
-    const PopupMenuItem(value: 'history', child: Text('Version history')),
-    const PopupMenuItem(value: 'markdown', child: Text('Export as Markdown')),
-    const PopupMenuItem(value: 'pdf', child: Text('Export as PDF (to print)')),
-    const PopupMenuItem(value: 'archive', child: Text('Archive note')),
-    const PopupMenuItem(value: 'find', child: Text('Find in note (Ctrl+H)')),
-    const PopupMenuItem(value: 'help', child: Text('Keyboard shortcuts (F1)')),
+    PopupMenuItem(
+      value: 'history',
+      child: Text(context.l10n.noteVersionHistory),
+    ),
+    PopupMenuItem(
+      value: 'markdown',
+      child: Text(context.l10n.noteExportAsMarkdown),
+    ),
+    PopupMenuItem(
+      value: 'pdf',
+      child: Text(context.l10n.noteExportAsPdfToPrint),
+    ),
+    PopupMenuItem(value: 'archive', child: Text(context.l10n.noteArchiveNote)),
+    PopupMenuItem(value: 'find', child: Text(context.l10n.noteFindInNoteCtrlH)),
+    PopupMenuItem(
+      value: 'help',
+      child: Text(context.l10n.noteKeyboardShortcutsF),
+    ),
     const PopupMenuDivider(),
   ];
 
@@ -461,7 +486,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       await widget.onFindNotes!();
     } catch (_) {
       if (mounted) {
-        _message('Save failed. Retry before returning to your notes.');
+        _message(context.l10n.noteSaveFailedRetryBeforeReturning);
       }
     }
   }
@@ -567,7 +592,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     } catch (_) {
       _closing = false;
       if (mounted) {
-        _message('Save failed. Retry saving before closing, or keep editing.');
+        _message(context.l10n.noteSaveFailedRetrySavingBefore);
       }
     } finally {
       _closeInProgress = false;
@@ -579,18 +604,16 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Delete this note?'),
-          content: const Text(
-            'Move this note to Trash? You can restore it later.',
-          ),
+          title: Text(context.l10n.noteDeleteThisNote),
+          content: Text(context.l10n.noteMoveThisNoteToTrash),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.bulkCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete'),
+              child: Text(context.l10n.noteDelete),
             ),
           ],
         ),
@@ -606,14 +629,16 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Moved to Trash'),
+            content: Text(context.l10n.noteMovedToTrash),
             action: SnackBarAction(
-              label: 'Undo',
+              label: context.l10n.noteUndo,
               onPressed: () async {
                 try {
                   await widget.controller.restore(note.id);
                 } catch (error) {
-                  if (mounted) _message('Could not restore: $error');
+                  if (mounted) {
+                    _message(context.l10n.noteCouldNotRestore('$error'));
+                  }
                 }
               },
             ),
@@ -627,7 +652,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       }
     } catch (error) {
       _closing = false;
-      if (mounted) _message('Could not move to Trash: $error');
+      if (mounted) _message(context.l10n.noteCouldNotMoveToTrash('$error'));
     }
   }
 
@@ -638,7 +663,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       final bytes = await prepareNoteImage(await image.readAsBytes());
       await _addImage(bytes);
     } catch (error) {
-      if (mounted) _message('Could not add image: $error');
+      if (mounted) _message(context.l10n.noteCouldNotAddImage('$error'));
     }
   }
 
@@ -681,7 +706,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       final bytes =
           await (widget.clipboardImageReader?.call() ?? Pasteboard.image);
       if (bytes == null) {
-        if (!silentWhenEmpty && mounted) _message('No image on the clipboard.');
+        if (!silentWhenEmpty && mounted) {
+          _message(context.l10n.noteNoImageOnTheClipboard);
+        }
         return false;
       }
       final normalized = await prepareClipboardImage(bytes);
@@ -691,7 +718,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       return true;
     } catch (error) {
       if (mounted && !silentWhenEmpty) {
-        _message('Could not paste image: $error');
+        _message(context.l10n.noteCouldNotPasteImage('$error'));
       }
       return false;
     }
@@ -765,7 +792,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Note color',
+                  context.l10n.noteNoteColor,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 20),
@@ -811,10 +838,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       if (note == null) return const SizedBox.shrink();
       final noteColor = Color(noteColors[note.colorIndex % noteColors.length]);
       final saveStatus = _saveError != null
-          ? 'Save failed'
+          ? context.l10n.noteSaveFailed
           : _saving != null || _observedDocument != _savedDocument
-          ? 'Saving…'
-          : 'Saved locally';
+          ? context.l10n.noteSaving
+          : context.l10n.noteSavedLocally;
       return PopScope(
         canPop: _closing,
         onPopInvokedWithResult: (didPop, result) {
@@ -837,17 +864,17 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                       alwaysOnTop: _alwaysOnTop,
                       menuItems: [
                         ..._organizationItems(note),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'minimize',
-                          child: Text('Minimize'),
+                          child: Text(context.l10n.windowChromeMinimize),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'share',
-                          child: Text('Share text'),
+                          child: Text(context.l10n.noteShareText),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
-                          child: Text('Delete note'),
+                          child: Text(context.l10n.noteDeleteNote),
                         ),
                       ],
                       onHover: (hovered) {
@@ -871,7 +898,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                     )
                   : AppBar(
                       leading: IconButton(
-                        tooltip: 'Close note',
+                        tooltip: context.l10n.noteDesktopHeaderCloseNote,
                         icon: const Icon(Icons.arrow_back),
                         onPressed: _close,
                       ),
@@ -882,12 +909,12 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                       ),
                       actions: [
                         IconButton(
-                          tooltip: 'Change color',
+                          tooltip: context.l10n.noteDesktopHeaderChangeColor,
                           icon: const Icon(Icons.palette_outlined),
                           onPressed: () => _changeColor(note),
                         ),
                         PopupMenuButton<String>(
-                          tooltip: 'More actions',
+                          tooltip: context.l10n.noteDesktopHeaderMoreActions,
                           onSelected: (value) async {
                             if (value == 'share') {
                               await SharePlus.instance.share(
@@ -901,13 +928,13 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                           },
                           itemBuilder: (_) => [
                             ..._organizationItems(note),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'share',
-                              child: Text('Share text'),
+                              child: Text(context.l10n.noteShareText),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
-                              child: Text('Delete note'),
+                              child: Text(context.l10n.noteDeleteNote),
                             ),
                           ],
                         ),
@@ -1023,7 +1050,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                                       .selection
                                                       .isCollapsed)
                                                     ContextMenuButtonItem(
-                                                      label: 'Change color',
+                                                      label: context
+                                                          .l10n
+                                                          .noteDesktopHeaderChangeColor,
                                                       onPressed: () {
                                                         state.hideToolbar();
                                                         _chooseTextColor(
@@ -1040,7 +1069,8 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                             onRemove: _removeInlineImage,
                                           ),
                                         ],
-                                        placeholder: 'Write a note...',
+                                        placeholder:
+                                            context.l10n.noteWriteANote,
                                         padding: const EdgeInsets.all(4),
                                         // Resolve Windows Backspace in the editor's
                                         // own Actions scope, including held-key repeats.
@@ -1086,12 +1116,14 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                     liveRegion: true,
                                     child: ListTile(
                                       dense: true,
-                                      title: const Text(
-                                        'Save failed. Keep editing or retry.',
+                                      title: Text(
+                                        context
+                                            .l10n
+                                            .noteSaveFailedKeepEditingOr,
                                       ),
                                       trailing: TextButton(
                                         onPressed: _autoSave,
-                                        child: const Text('Retry'),
+                                        child: Text(context.l10n.noteRetry),
                                       ),
                                     ),
                                   ),
@@ -1130,7 +1162,8 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                 Row(
                                   children: [
                                     IconButton(
-                                      tooltip: 'Text style options',
+                                      tooltip:
+                                          context.l10n.noteTextStyleOptions,
                                       isSelected: _showTextStyle,
                                       icon: const Icon(Icons.text_format),
                                       onPressed: () => setState(() {
@@ -1138,7 +1171,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                       }),
                                     ),
                                     IconButton(
-                                      tooltip: 'Add image',
+                                      tooltip: context.l10n.noteAddImage,
                                       icon: const Icon(
                                         Icons.add_photo_alternate_outlined,
                                       ),
@@ -1146,7 +1179,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                           _pickImage(ImageSource.gallery),
                                     ),
                                     IconButton(
-                                      tooltip: 'Paste image from clipboard',
+                                      tooltip: context
+                                          .l10n
+                                          .notePasteImageFromClipboard,
                                       icon: const Icon(
                                         Icons.content_paste_outlined,
                                       ),
@@ -1158,7 +1193,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                             defaultTargetPlatform ==
                                                 TargetPlatform.iOS))
                                       IconButton(
-                                        tooltip: 'Take photo',
+                                        tooltip: context.l10n.noteTakePhoto,
                                         icon: const Icon(
                                           Icons.camera_alt_outlined,
                                         ),
@@ -1166,7 +1201,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                             _pickImage(ImageSource.camera),
                                       ),
                                     IconButton(
-                                      tooltip: 'Draw',
+                                      tooltip: context.l10n.noteDraw,
                                       icon: const Icon(Icons.draw_outlined),
                                       onPressed: () => _editInk(note),
                                     ),
@@ -1178,14 +1213,15 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                         child: Align(
                                           alignment: Alignment.centerRight,
                                           child: _addingImage || _saving != null
-                                              ? const SizedBox(
+                                              ? SizedBox(
                                                   width: 18,
                                                   height: 18,
                                                   child:
                                                       CircularProgressIndicator(
                                                         strokeWidth: 2,
-                                                        semanticsLabel:
-                                                            'Saving locally',
+                                                        semanticsLabel: context
+                                                            .l10n
+                                                            .noteSavingLocally,
                                                       ),
                                                 )
                                               : Semantics(
@@ -1235,25 +1271,25 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         PopupMenuItem(
           value: 'cut',
           enabled: hasSelection,
-          child: const Text('Cut'),
+          child: Text(context.l10n.noteCut),
         ),
         PopupMenuItem(
           value: 'copy',
           enabled: hasSelection,
-          child: const Text('Copy'),
+          child: Text(context.l10n.noteCopy),
         ),
-        const PopupMenuItem(value: 'paste', child: Text('Paste')),
-        const PopupMenuItem(value: 'all', child: Text('Select all')),
+        PopupMenuItem(value: 'paste', child: Text(context.l10n.notePaste)),
+        PopupMenuItem(value: 'all', child: Text(context.l10n.noteSelectAll)),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'color',
           enabled: hasSelection,
-          child: const Text('Change color'),
+          child: Text(context.l10n.noteDesktopHeaderChangeColor),
         ),
         PopupMenuItem(
           value: 'highlight',
           enabled: hasSelection,
-          child: const Text('Highlight color'),
+          child: Text(context.l10n.noteHighlightColor),
         ),
       ],
     );
@@ -1286,7 +1322,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
           await _chooseTextColor(quill.Attribute.background, selection);
       }
     } catch (error) {
-      if (mounted) _message('Could not complete that action: $error');
+      if (mounted) {
+        _message(context.l10n.noteCouldNotCompleteThatAction('$error'));
+      }
     }
     if (mounted) _editorFocus.requestFocus();
   }
@@ -1298,7 +1336,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     try {
       await _pickTextColor(attribute, knownSelection);
     } catch (error) {
-      if (mounted) _message('Could not change text color: $error');
+      if (mounted) _message(context.l10n.noteCouldNotChangeTextColor('$error'));
     }
   }
 
@@ -1313,8 +1351,8 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     final color = await showTextColorDialog(
       context,
       title: attribute.key == quill.Attribute.color.key
-          ? 'Text color'
-          : 'Highlight color',
+          ? context.l10n.textStylePanelTextColor
+          : context.l10n.noteHighlightColor,
       initialColor:
           _editor.getSelectionStyle().attributes[attribute.key]?.value
               as String?,

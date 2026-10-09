@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/l10n.dart';
+
 /// Find-in-note strip; match state and navigation stay with the editor.
 class FindBar extends StatelessWidget {
   const FindBar({
@@ -42,8 +44,8 @@ class FindBar extends StatelessWidget {
                 key: const ValueKey('find-in-note'),
                 controller: textController,
                 focusNode: focusNode,
-                decoration: const InputDecoration(
-                  hintText: 'Find in this note (Ctrl+H)',
+                decoration: InputDecoration(
+                  hintText: context.l10n.findBarFindInThisNoteCtrl,
                   border: InputBorder.none,
                 ),
                 onChanged: (_) => onQueryChanged(),
@@ -59,17 +61,17 @@ class FindBar extends StatelessWidget {
             semanticsLabel: '$matches matches',
           ),
           IconButton(
-            tooltip: 'Previous match',
+            tooltip: context.l10n.findBarPreviousMatch,
             onPressed: matches == 0 ? null : () => onStep(-1),
             icon: const Icon(Icons.keyboard_arrow_up),
           ),
           IconButton(
-            tooltip: 'Next match',
+            tooltip: context.l10n.findBarNextMatch,
             onPressed: matches == 0 ? null : () => onStep(1),
             icon: const Icon(Icons.keyboard_arrow_down),
           ),
           IconButton(
-            tooltip: 'Close find',
+            tooltip: context.l10n.findBarCloseFind,
             onPressed: onClose,
             icon: const Icon(Icons.close),
           ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
+import '../l10n/l10n.dart';
+
 /// Expandable font size, color, heading, and list controls for the editor.
 class TextStylePanel extends StatelessWidget {
   const TextStylePanel({
@@ -23,9 +25,7 @@ class TextStylePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Select text to style it, or choose a style before typing.',
-          ),
+          Text(context.l10n.textStylePanelSelectTextToStyleIt),
           Wrap(
             spacing: 4,
             runSpacing: 4,
@@ -48,12 +48,12 @@ class TextStylePanel extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Text color',
+                tooltip: context.l10n.textStylePanelTextColor,
                 icon: const Icon(Icons.format_color_text),
                 onPressed: () => onChooseColor(quill.Attribute.color),
               ),
               IconButton(
-                tooltip: 'Highlight color',
+                tooltip: context.l10n.noteHighlightColor,
                 icon: const Icon(Icons.format_color_fill),
                 onPressed: () => onChooseColor(quill.Attribute.background),
               ),

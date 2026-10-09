@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
+
 /// Null cancels, an empty string clears the attribute, otherwise returns #RRGGBB.
 Future<String?> showTextColorDialog(
   BuildContext context, {
@@ -109,8 +111,8 @@ class _TextColorDialogState extends State<_TextColorDialog> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _hex,
-              decoration: const InputDecoration(
-                labelText: 'Hex color',
+              decoration: InputDecoration(
+                labelText: context.l10n.textColorHexColor,
                 hintText: '#795082',
               ),
               autocorrect: false,
@@ -118,7 +120,7 @@ class _TextColorDialogState extends State<_TextColorDialog> {
               onChanged: (_) => setState(() {}),
               onFieldSubmitted: (_) => _apply(),
               validator: (_) => _normalized == null
-                  ? 'Enter six hex digits, such as #795082.'
+                  ? context.l10n.textColorEnterSixHexDigitsSuch
                   : null,
             ),
           ],
@@ -128,13 +130,13 @@ class _TextColorDialogState extends State<_TextColorDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context, ''),
-        child: const Text('Reset color'),
+        child: Text(context.l10n.textColorResetColor),
       ),
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(context.l10n.bulkCancel),
       ),
-      FilledButton(onPressed: _apply, child: const Text('Apply')),
+      FilledButton(onPressed: _apply, child: Text(context.l10n.notesHomeApply)),
     ],
   );
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/l10n.dart';
 import '../data/note.dart';
 
 /// Auto-hiding colored header for Windows note windows. Visibility and hover
@@ -75,7 +76,7 @@ class NoteDesktopHeader extends StatelessWidget implements PreferredSizeWidget {
                     children: [
                       if (onNewNote != null)
                         IconButton(
-                          tooltip: 'New note',
+                          tooltip: context.l10n.noteDesktopHeaderNewNote,
                           onPressed: onNewNote,
                           icon: const Icon(Icons.add),
                         ),
@@ -98,28 +99,28 @@ class NoteDesktopHeader extends StatelessWidget implements PreferredSizeWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Change color',
+                        tooltip: context.l10n.noteDesktopHeaderChangeColor,
                         onPressed: onChangeColor,
                         icon: const Icon(Icons.palette_outlined),
                       ),
                       IconButton(
                         tooltip: alwaysOnTop
-                            ? 'Turn off always on top'
-                            : 'Always on top',
+                            ? context.l10n.noteDesktopHeaderTurnOffAlwaysOnTop
+                            : context.l10n.noteDesktopHeaderAlwaysOnTop,
                         isSelected: alwaysOnTop,
                         onPressed: onToggleAlwaysOnTop,
                         icon: const Icon(Icons.push_pin_outlined),
                         selectedIcon: const Icon(Icons.push_pin),
                       ),
                       PopupMenuButton<String>(
-                        tooltip: 'More actions',
+                        tooltip: context.l10n.noteDesktopHeaderMoreActions,
                         onOpened: onMenuOpened,
                         onCanceled: onMenuCanceled,
                         onSelected: onMenuSelected,
                         itemBuilder: (_) => menuItems,
                       ),
                       IconButton(
-                        tooltip: 'Close note',
+                        tooltip: context.l10n.noteDesktopHeaderCloseNote,
                         onPressed: onClose,
                         icon: const Icon(Icons.close),
                       ),

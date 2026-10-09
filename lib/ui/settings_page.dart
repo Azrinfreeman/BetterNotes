@@ -35,18 +35,20 @@ class _SettingsPageState extends State<SettingsPage> {
     final c = widget.controller;
     final last = c.autoBackupLast;
     final status = c.autoBackupRunning
-        ? 'Backing up now...'
+        ? context.l10n.settingsBackingUpNow
         : c.autoBackupError ??
               (last == null
-                  ? 'No automatic backup has run yet.'
-                  : 'Last backup: ${last.toLocal().toString().substring(0, 16)}');
+                  ? context.l10n.settingsNoAutomaticBackupHasRun
+                  : context.l10n.settingsLastBackup(
+                      last.toLocal().toString().substring(0, 16),
+                    ));
     return [
       ListTile(
         leading: const Icon(Icons.schedule_outlined),
-        title: const Text('Automatic backups'),
+        title: Text(context.l10n.settingsAutomaticBackups),
         subtitle: Text(
           c.autoBackupFolder == null
-              ? 'Off. Choose a folder to save a complete backup about once a day.'
+              ? context.l10n.settingsOffChooseAFolderTo
               : '${c.autoBackupFolder}\n$status',
         ),
         textColor: c.autoBackupError == null
@@ -67,13 +69,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (folder != null) await c.setAutoBackupFolder(folder);
                 },
                 child: Text(
-                  c.autoBackupFolder == null ? 'Choose folder' : 'Change',
+                  c.autoBackupFolder == null
+                      ? context.l10n.settingsChooseFolder
+                      : 'Change',
                 ),
               ),
               if (c.autoBackupFolder != null)
                 TextButton(
                   onPressed: () => c.setAutoBackupFolder(null),
-                  child: const Text('Turn off'),
+                  child: Text(context.l10n.settingsTurnOff),
                 ),
             ],
           ),
@@ -86,7 +90,7 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
             children: [
-              const Text('Keep the newest backups'),
+              Text(context.l10n.settingsKeepTheNewestBackups),
               DropdownButton<int>(
                 key: const ValueKey('auto-backup-keep'),
                 value: const [3, 7, 14, 30].contains(c.autoBackupKeep)
@@ -106,7 +110,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 onPressed: c.autoBackupRunning
                     ? null
                     : () => c.runAutoBackup(force: true),
-                child: const Text('Back up now'),
+                child: Text(context.l10n.settingsBackUpNow),
               ),
             ],
           ),
@@ -127,7 +131,9 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('File operation failed: $error')),
+          SnackBar(
+            content: Text(context.l10n.settingsFileOperationFailed('$error')),
+          ),
         );
       }
     } finally {
@@ -136,27 +142,25 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<String?> _exportBackup() async {
+    final l10n = context.l10n;
     final bytes = await widget.controller.exportBackup();
     final date = DateTime.now().toIso8601String().substring(0, 10);
     final saved = await backup_files.saveBackupFile(
       bytes,
       'BetterNotes-backup-$date.zip',
     );
-    return saved
-        ? 'Backup exported. Keep this readable file in a safe place.'
-        : null;
+    return saved ? l10n.settingsBackupExportedKeepThisReadable : null;
   }
 
   Future<String?> _exportText() async {
+    final l10n = context.l10n;
     final text = await widget.controller.exportText();
     final saved = await backup_files.saveBackupFile(
       Uint8List.fromList(utf8.encode(text)),
       'BetterNotes-notes.txt',
       mimeType: 'text/plain',
     );
-    return saved
-        ? 'Text exported. Use a complete backup to restore images and formatting.'
-        : null;
+    return saved ? l10n.settingsTextExportedUseAComplete : null;
   }
 
   Future<String?> _importBackup() async {
@@ -170,18 +174,22 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Import backup as copies?'),
+          title: Text(context.l10n.settingsImportBackupAsCopies),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${backup.notes.length} notes (${backup.trashCount} in Trash), ${backup.assets.length} images.\n\nExisting notes are kept. Importing the same backup again creates more copies.',
+                  context.l10n.settingsNotesInTrashImagesExisting(
+                    '${backup.notes.length}',
+                    '${backup.trashCount}',
+                    '${backup.assets.length}',
+                  ),
                 ),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Restore appearance and editor preferences',
+                  title: Text(
+                    context.l10n.settingsRestoreAppearanceAndEditorPreferences,
                   ),
                   value: preferences,
                   onChanged: (value) =>
@@ -193,11 +201,11 @@ class _SettingsPageState extends State<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.bulkCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Import copies'),
+              child: Text(context.l10n.settingsImportCopies),
             ),
           ],
         ),
@@ -228,7 +236,9 @@ class _SettingsPageState extends State<SettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not read Windows startup setting: $error'),
+          content: Text(
+            context.l10n.settingsCouldNotReadWindowsStartup('$error'),
+          ),
         ),
       );
     } finally {
@@ -244,7 +254,11 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not change Windows startup: $error')),
+          SnackBar(
+            content: Text(
+              context.l10n.settingsCouldNotChangeWindowsStartup('$error'),
+            ),
+          ),
         );
       }
     } finally {
@@ -257,8 +271,12 @@ class _SettingsPageState extends State<SettingsPage> {
     animation: widget.controller,
     builder: (context, _) => Scaffold(
       appBar: AppBar(
-        title: const WindowTitle(
-          child: Text('Settings', maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: WindowTitle(
+          child: Text(
+            context.l10n.notesHomeSettings,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         actions: const [WindowButtons(), SizedBox(width: 8)],
       ),
@@ -267,13 +285,15 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
-            title: Text(widget.controller.email ?? 'Local notes'),
+            title: Text(
+              widget.controller.email ?? context.l10n.notesHomeLocalNotes,
+            ),
             subtitle: Text(
               widget.controller.cloudAvailable
                   ? widget.controller.signedIn
-                        ? 'Your notes can sync across devices.'
-                        : 'Sign in with Google to sync your notes.'
-                  : 'Google sync needs a Supabase project connection.',
+                        ? context.l10n.settingsYourNotesCanSyncAcross
+                        : context.l10n.settingsSignInWithGoogleTo
+                  : context.l10n.settingsGoogleSyncNeedsASupabase,
             ),
           ),
           if (widget.controller.cloudAvailable && !widget.controller.signedIn)
@@ -288,19 +308,23 @@ class _SettingsPageState extends State<SettingsPage> {
                     } catch (error) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Sign-in failed: $error')),
+                          SnackBar(
+                            content: Text(
+                              context.l10n.settingsSignInFailed('$error'),
+                            ),
+                          ),
                         );
                       }
                     }
                   },
-                  child: const Text('Continue with Google'),
+                  child: Text(context.l10n.settingsContinueWithGoogle),
                 ),
               ),
             ),
           if (widget.controller.signedIn)
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Sign out'),
+              title: Text(context.l10n.settingsSignOut),
               onTap: () async {
                 try {
                   await widget.controller.signOut();
@@ -315,11 +339,11 @@ class _SettingsPageState extends State<SettingsPage> {
           if (widget.controller.syncError != null)
             ListTile(
               leading: const Icon(Icons.cloud_off_outlined),
-              title: const Text('Sync needs attention'),
+              title: Text(context.l10n.settingsSyncNeedsAttention),
               subtitle: Text(widget.controller.syncError!),
               trailing: TextButton(
                 onPressed: widget.controller.sync,
-                child: const Text('Retry'),
+                child: Text(context.l10n.noteRetry),
               ),
             ),
           const Divider(),
@@ -328,25 +352,25 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Appearance'),
+                Text(context.l10n.settingsAppearance),
                 DropdownButton<ThemeMode>(
                   isExpanded: true,
                   value: widget.controller.themeMode,
                   onChanged: (mode) {
                     if (mode != null) widget.controller.setTheme(mode);
                   },
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: ThemeMode.system,
-                      child: Text('System'),
+                      child: Text(context.l10n.settingsSystem),
                     ),
                     DropdownMenuItem(
                       value: ThemeMode.light,
-                      child: Text('Light'),
+                      child: Text(context.l10n.settingsLight),
                     ),
                     DropdownMenuItem(
                       value: ThemeMode.dark,
-                      child: Text('Dark'),
+                      child: Text(context.l10n.settingsDark),
                     ),
                   ],
                 ),
@@ -355,7 +379,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.delete_outline),
-            title: const Text('Confirm before deleting'),
+            title: Text(context.l10n.settingsConfirmBeforeDeleting),
             value: widget.controller.confirmDelete,
             onChanged: widget.controller.setConfirmDelete,
           ),
@@ -364,20 +388,29 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Empty Trash automatically'),
-                const Text(
-                  'Permanently deletes local notes after this long in Trash. '
-                  'Signed-in account notes keep their sync records and are not removed.',
-                ),
+                Text(context.l10n.settingsEmptyTrashAutomatically),
+                Text(context.l10n.settingsPermanentlyDeletesLocalNotesAfter),
                 DropdownButton<int>(
                   key: const ValueKey('trash-retention'),
                   isExpanded: true,
                   value: widget.controller.trashRetentionDays,
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('Never')),
-                    DropdownMenuItem(value: 7, child: Text('After 7 days')),
-                    DropdownMenuItem(value: 30, child: Text('After 30 days')),
-                    DropdownMenuItem(value: 90, child: Text('After 90 days')),
+                  items: [
+                    DropdownMenuItem(
+                      value: 0,
+                      child: Text(context.l10n.settingsNever),
+                    ),
+                    DropdownMenuItem(
+                      value: 7,
+                      child: Text(context.l10n.settingsAfterDays),
+                    ),
+                    DropdownMenuItem(
+                      value: 30,
+                      child: Text(context.l10n.settingsAfterDays2),
+                    ),
+                    DropdownMenuItem(
+                      value: 90,
+                      child: Text(context.l10n.settingsAfterDays3),
+                    ),
                   ],
                   onChanged: (days) {
                     if (days != null) {
@@ -393,20 +426,21 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Image placement'),
-                const Text(
-                  'Applies to new images. Existing images stay in place.',
-                ),
+                Text(context.l10n.settingsImagePlacement),
+                Text(context.l10n.settingsAppliesToNewImagesExisting),
                 DropdownButton<bool>(
                   key: const ValueKey('image-placement'),
                   isExpanded: true,
                   value: widget.controller.inlineImages,
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: false,
-                      child: Text('Above text (current)'),
+                      child: Text(context.l10n.settingsAboveTextCurrent),
                     ),
-                    DropdownMenuItem(value: true, child: Text('Within note')),
+                    DropdownMenuItem(
+                      value: true,
+                      child: Text(context.l10n.settingsWithinNote),
+                    ),
                   ],
                   onChanged: (value) async {
                     if (value == null) return;
@@ -417,7 +451,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Could not save image placement: $error',
+                              context.l10n.settingsCouldNotSaveImagePlacement(
+                                '$error',
+                              ),
                             ),
                           ),
                         );
@@ -432,9 +468,9 @@ class _SettingsPageState extends State<SettingsPage> {
             const Divider(),
             SwitchListTile(
               secondary: const Icon(Icons.visibility_outlined),
-              title: const Text('Always show note header'),
-              subtitle: const Text(
-                'Keep note actions visible without hovering.',
+              title: Text(context.l10n.settingsAlwaysShowNoteHeader),
+              subtitle: Text(
+                context.l10n.settingsKeepNoteActionsVisibleWithout,
               ),
               value: widget.controller.alwaysShowNoteHeader,
               onChanged: (value) async {
@@ -445,7 +481,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Could not save header preference: $error',
+                          context.l10n.settingsCouldNotSaveHeaderPreference(
+                            '$error',
+                          ),
                         ),
                       ),
                     );
@@ -456,14 +494,10 @@ class _SettingsPageState extends State<SettingsPage> {
             SwitchListTile(
               key: const ValueKey('reminder-task'),
               secondary: const Icon(Icons.alarm_outlined),
-              title: const Text('Remind me when BetterNotes is closed'),
+              title: Text(context.l10n.settingsRemindMeWhenBetternotesIs),
               subtitle: Text(
                 widget.controller.reminderTaskError ??
-                    'Adds a Windows scheduled task (BetterNotes Reminders, '
-                        'this user only) that opens BetterNotes when a '
-                        'reminder is due or at sign-in. Best effort: a '
-                        'reminder missed while the PC was off is shown the '
-                        'next time the app starts. Turn off to remove the task.',
+                    context.l10n.settingsAddsAWindowsScheduledTask,
                 style: widget.controller.reminderTaskError == null
                     ? null
                     : TextStyle(color: Theme.of(context).colorScheme.error),
@@ -477,7 +511,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Could not update the scheduled task: $error',
+                          context.l10n.settingsCouldNotUpdateTheScheduled(
+                            '$error',
+                          ),
                         ),
                       ),
                     );
@@ -488,11 +524,8 @@ class _SettingsPageState extends State<SettingsPage> {
             SwitchListTile(
               key: const ValueKey('keep-in-tray'),
               secondary: const Icon(Icons.dock_outlined),
-              title: const Text('Keep running in the system tray'),
-              subtitle: const Text(
-                'Closing the notes window hides it; use the tray icon to open '
-                'notes, start a note, or Quit.',
-              ),
+              title: Text(context.l10n.settingsKeepRunningInTheSystem),
+              subtitle: Text(context.l10n.settingsClosingTheNotesWindowHides),
               value: widget.controller.keepInTray,
               onChanged: (value) async {
                 try {
@@ -501,7 +534,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Could not change tray mode: $error'),
+                        content: Text(
+                          context.l10n.settingsCouldNotChangeTrayMode('$error'),
+                        ),
                       ),
                     );
                   }
@@ -513,9 +548,10 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Quick note shortcut'),
+                  Text(context.l10n.settingsQuickNoteShortcut),
                   Text(
-                    widget.controller.quickCaptureError ?? 'A global shortcut that opens a new note from any app while BetterNotes is running.',
+                    widget.controller.quickCaptureError ??
+                        context.l10n.settingsAGlobalShortcutThatOpens,
                     style: widget.controller.quickCaptureError == null
                         ? null
                         : TextStyle(color: Theme.of(context).colorScheme.error),
@@ -535,8 +571,13 @@ class _SettingsPageState extends State<SettingsPage> {
                               content: Text(
                                 error is PlatformException &&
                                         error.code == 'hotkey_in_use'
-                                    ? 'Another app already uses that shortcut. Choose a different one.'
-                                    : 'Could not set the shortcut: $error',
+                                    ? context
+                                          .l10n
+                                          .settingsAnotherAppAlreadyUsesThat
+                                    : context.l10n
+                                          .settingsCouldNotSetTheShortcut(
+                                            '$error',
+                                          ),
                               ),
                             ),
                           );
@@ -557,11 +598,8 @@ class _SettingsPageState extends State<SettingsPage> {
             SwitchListTile(
               key: const ValueKey('fast-note-opening'),
               secondary: const Icon(Icons.bolt_outlined),
-              title: const Text('Fast note opening'),
-              subtitle: const Text(
-                'Keep one idle note window ready. Uses some memory; turn off '
-                'to open notes a little slower.',
-              ),
+              title: Text(context.l10n.settingsFastNoteOpening),
+              subtitle: Text(context.l10n.settingsKeepOneIdleNoteWindow),
               value: widget.controller.fastNoteOpening,
               onChanged: (value) async {
                 try {
@@ -570,7 +608,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Could not save this preference: $error'),
+                        content: Text(
+                          context.l10n.settingsCouldNotSaveThisPreference(
+                            '$error',
+                          ),
+                        ),
                       ),
                     );
                   }
@@ -582,8 +624,8 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Window buttons'),
-                  const Text('Applies to all BetterNotes windows.'),
+                  Text(context.l10n.settingsWindowButtons),
+                  Text(context.l10n.settingsAppliesToAllBetternotesWindows),
                   DropdownButton<bool>(
                     key: const ValueKey('window-buttons'),
                     isExpanded: true,
@@ -597,16 +639,24 @@ class _SettingsPageState extends State<SettingsPage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Could not save window buttons: $error',
+                                context.l10n.settingsCouldNotSaveWindowButtons(
+                                  '$error',
+                                ),
                               ),
                             ),
                           );
                         }
                       }
                     },
-                    items: const [
-                      DropdownMenuItem(value: false, child: Text('Windows')),
-                      DropdownMenuItem(value: true, child: Text('BetterNotes')),
+                    items: [
+                      DropdownMenuItem(
+                        value: false,
+                        child: Text(context.l10n.settingsWindows),
+                      ),
+                      DropdownMenuItem(
+                        value: true,
+                        child: Text(context.l10n.windowChromeBetternotes),
+                      ),
                     ],
                   ),
                 ],
@@ -615,26 +665,24 @@ class _SettingsPageState extends State<SettingsPage> {
             if (_autoStartEnabled == null)
               ListTile(
                 leading: const Icon(Icons.power_settings_new_outlined),
-                title: const Text('Start with Windows'),
+                title: Text(context.l10n.settingsStartWithWindows),
                 subtitle: Text(
                   _loadingAutoStart
-                      ? 'Checking Windows startup setting'
-                      : 'Could not read Windows startup setting',
+                      ? context.l10n.settingsCheckingWindowsStartupSetting
+                      : context.l10n.settingsCouldNotReadWindowsStartup2,
                 ),
                 trailing: _loadingAutoStart
                     ? const CircularProgressIndicator()
                     : TextButton(
                         onPressed: _loadAutoStart,
-                        child: const Text('Retry'),
+                        child: Text(context.l10n.noteRetry),
                       ),
               )
             else
               SwitchListTile(
                 secondary: const Icon(Icons.power_settings_new_outlined),
-                title: const Text('Start with Windows'),
-                subtitle: const Text(
-                  'Open BetterNotes when you sign in to Windows.',
-                ),
+                title: Text(context.l10n.settingsStartWithWindows),
+                subtitle: Text(context.l10n.settingsOpenBetternotesWhenYouSign),
                 value: _autoStartEnabled!,
                 onChanged: _savingAutoStart ? null : _setAutoStart,
               ),
@@ -642,9 +690,9 @@ class _SettingsPageState extends State<SettingsPage> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.backup_outlined),
-            title: const Text('Backup and restore'),
-            subtitle: const Text(
-              'Complete backups include Trash, formatting, images, and drawings. Exported files are readable and unencrypted.',
+            title: Text(context.l10n.settingsBackupAndRestore),
+            subtitle: Text(
+              context.l10n.settingsCompleteBackupsIncludeTrashFormatting,
             ),
             trailing: _workingFiles
                 ? const SizedBox(
@@ -656,17 +704,15 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ListTile(
             leading: const Icon(Icons.file_download_outlined),
-            title: const Text('Export complete backup'),
+            title: Text(context.l10n.settingsExportCompleteBackup),
             onTap: _workingFiles ? null : () => _fileAction(_exportBackup),
           ),
           ListTile(
             leading: const Icon(Icons.file_upload_outlined),
-            title: const Text('Import backup'),
+            title: Text(context.l10n.settingsImportBackup),
             subtitle: backup_files.canImportBackup
-                ? const Text(
-                    'Review and add copies without replacing existing notes.',
-                  )
-                : const Text('Import is not available on this platform.'),
+                ? Text(context.l10n.settingsReviewAndAddCopiesWithout)
+                : Text(context.l10n.settingsImportIsNotAvailableOn),
             enabled: !_workingFiles && backup_files.canImportBackup,
             onTap: _workingFiles || !backup_files.canImportBackup
                 ? null
@@ -675,17 +721,15 @@ class _SettingsPageState extends State<SettingsPage> {
           if (auto_backup.canAutoBackup) ..._autoBackupTiles(),
           ListTile(
             leading: const Icon(Icons.description_outlined),
-            title: const Text('Export active notes as text'),
-            subtitle: const Text(
-              'Text only; use a complete backup for restoration.',
-            ),
+            title: Text(context.l10n.settingsExportActiveNotesAsText),
+            subtitle: Text(context.l10n.settingsTextOnlyUseAComplete),
             onTap: _workingFiles ? null : () => _fileAction(_exportText),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.keyboard_outlined),
-            title: const Text('Keyboard shortcuts'),
-            subtitle: const Text('Editing, search, and window controls.'),
+            title: Text(context.l10n.settingsKeyboardShortcuts),
+            subtitle: Text(context.l10n.settingsEditingSearchAndWindowControls),
             onTap: () => showShortcutsHelp(context),
           ),
           ListTile(

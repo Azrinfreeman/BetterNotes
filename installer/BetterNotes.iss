@@ -52,6 +52,39 @@ Source: "{#ReleaseDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubd
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "BetterNotes.Desktop"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "BetterNotes.Desktop"; Tasks: desktopicon
 
+[Code]
+// The app runs its own save-then-exit routine, which Windows' Restart Manager
+// does not wait for. Ask a running copy to quit first (`--quit`), then wait
+// for its window to go away. Older builds ignore this and fall back to the
+// Restart Manager prompt.
+procedure CloseRunningApp();
+var
+  ResultCode, I: Integer;
+  Exe: String;
+begin
+  Exe := ExpandConstant('{app}\{#AppExe}');
+  if not FileExists(Exe) then Exit;
+  if FindWindowByWindowName('better_notes') = 0 then Exit;
+  Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  for I := 1 to 60 do
+  begin
+    if FindWindowByWindowName('better_notes') = 0 then Break;
+    Sleep(500);
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  CloseRunningApp();
+  Result := '';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  CloseRunningApp();
+  Result := True;
+end;
+
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent
 

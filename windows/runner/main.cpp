@@ -68,8 +68,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const bool reminders_due =
       std::find(command_line_arguments.begin(), command_line_arguments.end(),
                 "--reminders-due") != command_line_arguments.end();
+  // `--quit` (used by the installer): ask a running copy to save and exit,
+  // and never start a new one.
+  const bool quit_requested =
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--quit") != command_line_arguments.end();
   HWND existing =
       FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"better_notes");
+  if (quit_requested) {
+    if (existing != nullptr) {
+      DWORD_PTR ignored = 0;
+      SendMessageTimeoutW(existing, kBetterNotesActivateMessage, 3, 0,
+                          SMTO_ABORTIFHUNG, 3000, &ignored);
+    }
+    ::CoUninitialize();
+    return EXIT_SUCCESS;
+  }
   if (existing != nullptr) {
     DWORD_PTR ignored = 0;
     const LRESULT delivered =
