@@ -44,6 +44,28 @@ class LocalStore {
     await _notes.record(id).delete(database);
   }
 
+  /// Compare and acknowledge in one transaction so an in-flight sync cannot
+  /// replace a newer local save between its read and write.
+  Future<void> acknowledgeRemote(Note snapshot, Note server) async {
+    await database.transaction((txn) async {
+      final value = await _notes.record(snapshot.id).get(txn);
+      if (value == null) return; // A purged record must not reappear.
+      final current = Note.fromJson(Map<String, dynamic>.from(value));
+      final changed =
+          jsonEncode(current.toJson()) != jsonEncode(snapshot.toJson());
+      final acknowledged = changed
+          ? current.copyWith(revision: server.revision)
+          : server.copyWith(
+              deletedAt: current.deletedAt,
+              title: current.title,
+              favorite: current.favorite,
+              tags: current.tags,
+              archivedAt: current.archivedAt,
+            );
+      await _notes.record(snapshot.id).put(txn, acknowledged.toJson());
+    });
+  }
+
   Future<void> moveGuestNotes(String ownerId) async {
     final guestNotes = await notesFor(guestOwner);
     for (final note in guestNotes) {
@@ -72,6 +94,32 @@ class LocalStore {
 
   Future<void> deleteImage(String imageId) async {
     await _assets.record(imageId).delete(database);
+  }
+
+  Future<void> importCollection(
+    List<Note> notes,
+    Map<String, Uint8List> assets,
+    Map<String, Object> preferences,
+  ) async {
+    await database.transaction((txn) async {
+      for (final entry in assets.entries) {
+        if (await _assets.record(entry.key).exists(txn)) {
+          throw StateError('An imported asset ID already exists.');
+        }
+        await _assets.record(entry.key).put(txn, {
+          'base64': base64Encode(entry.value),
+        });
+      }
+      for (final note in notes) {
+        if (await _notes.record(note.id).exists(txn)) {
+          throw StateError('An imported note ID already exists.');
+        }
+        await _notes.record(note.id).put(txn, note.toJson());
+      }
+      for (final entry in preferences.entries) {
+        await _settings.record(entry.key).put(txn, {'value': entry.value});
+      }
+    });
   }
 
   Future<void> setSetting(String key, Object value) =>

@@ -5,11 +5,13 @@ BetterNotes is a colorful sticky-notes app built with Flutter. It runs locally w
 ## Current features
 
 - Searchable newest-first notes list, colorful note cards, light/dark/system appearance
-- Rich text: bold, italic, underline, strikethrough, bullets, undo, and redo
+- Rich text: selected-text colors, highlighting, font sizes, headings, bold, italic, underline, strikethrough, lists, quotes, inline code, undo, and redo
 - Image selection and full-size preview, mobile camera capture, drawing with touch/stylus/mouse
 - Separate movable Windows note windows that remember their position and size; paste clipboard images into notes
 - Windows taskbar “New note” action, optional start with Windows, and keyboard shortcuts for note management and formatting
 - Auto-save, local offline storage, deletion confirmation, and text sharing
+- Local save progress and Retry, Trash with Undo/restore, complete backup/import, and text export
+- Optional titles, favorites, tags, Archive, saved filters/sorting, checklists, and find-in-note
 - Google sign-in and revision-based cloud sync when configured
 - Windows, Android, iOS, web, macOS, and Linux Flutter project scaffolds
 
@@ -28,9 +30,9 @@ For the Windows app, run `flutter run -d windows`. Notes open in their own windo
 
 **Settings → Image placement** offers **Above text (current)**, the default, and **Within note**. Within note inserts new images at the cursor between paragraphs and moves the cursor below the image so you can continue typing. Pasting in the middle of a paragraph splits it, preserving the remaining text. The choice applies to clipboard paste and image selection, is saved locally, and updates open Windows note windows. Existing images stay where they are when you switch preferences. Inline images support preview, removal, undo, and redo. Text wrapping beside images is not included. This feature is included in the dated 20261008 portable ZIP.
 
-A portable Windows archive is available at `dist/BetterNotes-Windows-1.0.2-20261008-portable.zip`. Extract the entire archive to one folder and run `better_notes.exe`; keep the `data` folder and DLL files beside the executable. Notes are saved in your Windows app-data folder, not inside the portable archive. Right-click the running app's taskbar icon for **New note**. In **Settings**, turn on **Start with Windows** to open the app when you sign in. This is off by default and applies only to your Windows account. If you move the extracted folder later, open the app from its new location and turn the setting off and on again to update the startup path.
+A portable Windows archive is available at [dist/BetterNotes-Windows-1.0.2-20261009-portable.zip](dist/BetterNotes-Windows-1.0.2-20261009-portable.zip), with a `.zip.sha256` checksum alongside it. It includes the current organization, backup, accessibility, text styling/right-click color, and note-opening performance changes. Extract the entire archive to one folder and run `better_notes.exe`; keep the `data` folder and DLL files beside the executable. Notes are saved in your Windows app-data folder, not inside the portable archive. Right-click the running app's taskbar icon for **New note**. In **Settings**, turn on **Start with Windows** to open the app when you sign in. This is off by default and applies only to your Windows account. If you move the extracted folder later, open the app from its new location and turn the setting off and on again to update the startup path.
 
-On Windows, `Ctrl+N` creates a note, `Ctrl+F` focuses the notes search, `Ctrl+W` closes a note window, `Ctrl+D` deletes the open note, and `Ctrl+T` toggles strikethrough. The editor also supports `Ctrl+B/I/U`, `Ctrl+Shift+L` for bullets, and `Ctrl+Z/Y` for undo/redo.
+On Windows, `Ctrl+N` creates a note, `Ctrl+F` focuses the notes search, `Ctrl+W` closes a note window, `Ctrl+D` deletes the open note, and `Ctrl+T` toggles strikethrough while editing. The editor also supports `Ctrl+B/I/U`, `Ctrl+Shift+L` for bullets, and `Ctrl+Z/Y` for undo/redo. `Ctrl+H` opens find-in-note, with previous/next controls and `Escape` to dismiss. `F1`, note menus, and **Settings → Keyboard shortcuts** open shortcut help.
 
 **Settings → Window buttons** lets you choose **Windows** or **BetterNotes** controls. Windows is the default. The choice is saved and applies immediately to the main window and note windows. BetterNotes provides themed minimize, maximize/restore, and close buttons; drag the title bar to move a window or double-click it to maximize/restore. These controls are included in the 1.0.2 portable archive.
 
@@ -39,6 +41,36 @@ The main notes list uses one header with BetterNotes window controls beside Sett
 On this machine, Flutter is installed at `C:\Users\azrin\develop\flutter` and added to the Windows user PATH. Open a new terminal before using `flutter` or `dart`. The original project-local SDK remains at `.tools/flutter/bin/flutter.bat` and is excluded from version control. Without cloud configuration, the app saves notes only on the current device/browser.
 
 Windows note windows now have a coloured header with **New note**, **Change color** (twelve colours), **Always on top**, **More actions**, and **Close note**. It fades when the pointer leaves; hover over the top edge or focus a header button with the keyboard to reveal it. Menus and the colour picker keep it visible. With BetterNotes window buttons, this is the note's only header; drag its empty space to move the window or double-click to maximize/restore. More actions includes minimize, share, and delete. Close saves and keeps the note; pinning applies until that window closes. These controls are included in the 1.0.2 portable archive.
+
+## Offline recovery and backups (current source)
+
+Delete moves notes to **Trash**, with Undo and Restore. Permanent deletion always asks for confirmation and is available for local notes; account Trash keeps the sync records needed to prevent deleted notes from reappearing. Cached images are retained conservatively for undo and recovery.
+
+In **Settings → Backup and restore**, export a complete backup before moving devices. Backups include active notes, Archive and Trash, titles/favorites/tags, formatting, images, drawings, and supported preferences. Import validates the archive first and shows counts, then adds copies with fresh IDs. Existing notes are preserved; repeated imports create more copies. Restoring preferences is optional. Text export includes titles and active-note text, including Archive, with `[ ]`/`[x]` checklist markers; Trash is excluded.
+
+## Organization and productivity (current source)
+
+To change selected text color, select the text, right-click it, and choose **Change color**. Pick a swatch or enter a six-digit hex color, then choose **Apply**. The menu keeps the usual clipboard actions.
+
+In a note, select text and open **Text style options** (the text-format icon beside Add image). Choose **Font size**, **Text color**, or **Highlight color**; colors support named swatches and custom six-digit hex values. **Apply** changes the selection, **Cancel** leaves it alone, and **Reset color** removes only that color. With no selection, styles apply to the text you type next. The panel also offers headings, numbered lists, quotes, inline code, and **Clear format**. Paragraph styles apply to the selected paragraphs. The panel scrolls in small windows; toggle the icon again to close it. Formatting is saved in notes and complete backups, and supports undo/redo. Text sharing/export remains plain text.
+
+Use a note's **More actions → Title and tags** to set an optional title and comma-separated tags. Blank titles use the first non-empty text line, then Image note/Ink note/Empty note. Tags are trimmed, deduplicated and lowercase. **Favorite** persists independently of the Windows **Always on top** toggle.
+
+**Notes** shows unarchived notes, with favorites first. **Favorites**, **Archive**, and **Trash** have separate views; **All active** also includes Archive. Search matches titles and body text within the selected view and tag filters. Every selected tag must match. Sorting and filters are saved on this device; **Reset filters** restores Notes/recently edited and clears tags/search. The wider-search action switches to All active while retaining selected tags and excluding Trash.
+
+**Archive note** saves and closes its editor while retaining content and window bounds. Archived windows stay closed on startup; use **Restore from Archive** before editing again. The editor's checklist button creates native rich-text checkboxes, with undo/redo and backup support; cards show completion counts when tasks exist. **Find in note (Ctrl+H)** selects matches across formatted text, with previous/next controls and Escape to return to editing. It preserves images and formatting.
+
+Titles, favorites, tags, Archive and library preferences currently remain local. Complete backup/import transfers note metadata; the existing configured cloud schema continues syncing body content without these new organization fields. The 20261009 portable ZIP includes the three implementation phases; older ZIPs predate them. Build and package verification are recorded in `STATUS.md`.
+
+Backups are readable, unencrypted ZIPs. Limits are 128 MB per backup, 5,000 notes, 10,000 images, 8 MB per image, and 16 MB of note JSON. Keep a complete exported ZIP; recompressing its contents is unsupported. Desktop and web support file import/export; mobile currently shares exports, with file import pending. Tokens, other accounts, startup registration, and window bounds are excluded.
+
+All three approved phases are implemented and included in the 20261009 portable package. Older packages are preserved; see `STATUS.md` for Windows build and package verification.
+
+## Accessibility and recovery (current source)
+
+Note headers reveal on keyboard focus and remain visible for touch, accessibility navigation, or reduced motion. On Windows, **Settings → Always show note header** keeps actions visible and applies to open note windows. The app follows the system high-contrast setting and supports enlarged text in light and dark themes. The library controls and lazy note cards share one scrollable layout so results remain reachable in small windows.
+
+Shortcut help explains common commands and keyboard navigation. Formatting shortcuts apply while editing note text; typing in find inputs and dialogs keeps its normal scope. Restore actions show confirmation, and unavailable images offer **Retry image** or guidance to restore a copy from a complete backup. Live screen-reader and Windows display-scaling checks remain pending.
 
 ## Connect Google account sync
 

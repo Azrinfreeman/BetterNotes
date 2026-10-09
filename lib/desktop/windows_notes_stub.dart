@@ -9,6 +9,7 @@ Future<DesktopCoordinator> createDesktopCoordinator() async =>
 class DesktopCoordinator {
   String? get noteId => null;
   bool get supportsNoteWindows => false;
+  bool get isNoteWindow => false;
   ValueListenable<int>? get closeRequests => null;
   ValueListenable<int>? get searchRequests => null;
 
@@ -19,4 +20,5 @@ class DesktopCoordinator {
   Future<NoteEditorStore> createRemote() async =>
       throw UnsupportedError('Desktop note windows are unavailable.');
   Future<void> closeSelf() async {}
+  Future<void> notifyReady() async {}
 }

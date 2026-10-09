@@ -22,18 +22,24 @@ const _supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   final windows = await desktop.createDesktopCoordinator();
-  if (windows.noteId != null) {
+  if (windows.isNoteWindow) {
     final remote = await windows.createRemote();
     runApp(
-      NoteWindowApp(
-        controller: remote,
-        noteId: windows.noteId!,
-        closeRequests: windows.closeRequests,
-        onClose: windows.closeSelf,
-        onNewNote: windows.createAndOpenNote,
-        onFindNotes: windows.focusSearch,
+      AnimatedBuilder(
+        animation: remote,
+        builder: (_, _) => NoteWindowApp(
+          controller: remote,
+          noteId: windows.noteId,
+          closeRequests: windows.closeRequests,
+          onClose: windows.closeSelf,
+          onNewNote: windows.createAndOpenNote,
+          onFindNotes: windows.focusSearch,
+        ),
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(windows.notifyReady());
+    });
     return;
   }
   SupabaseClient? cloud;
@@ -89,6 +95,11 @@ class BetterNotesApp extends StatelessWidget {
       themeMode: controller.themeMode,
       theme: betterNotesTheme(Brightness.light),
       darkTheme: betterNotesTheme(Brightness.dark),
+      highContrastTheme: betterNotesTheme(Brightness.light, highContrast: true),
+      highContrastDarkTheme: betterNotesTheme(
+        Brightness.dark,
+        highContrast: true,
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -116,7 +127,7 @@ class NoteWindowApp extends StatelessWidget {
   });
 
   final NoteEditorStore controller;
-  final String noteId;
+  final String? noteId;
   final Future<void> Function() onClose;
   final ValueListenable<int>? closeRequests;
   final Future<void> Function()? onNewNote;
@@ -136,35 +147,58 @@ class NoteWindowApp extends StatelessWidget {
       themeMode: controller.themeMode,
       theme: betterNotesTheme(Brightness.light),
       darkTheme: betterNotesTheme(Brightness.dark),
+      highContrastTheme: betterNotesTheme(Brightness.light, highContrast: true),
+      highContrastDarkTheme: betterNotesTheme(
+        Brightness.dark,
+        highContrast: true,
+      ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         quill.FlutterQuillLocalizations.delegate,
       ],
-      home: NotePage(
-        controller: controller,
-        noteId: noteId,
-        onClose: onClose,
-        closeRequests: closeRequests,
-        onNewNote: onNewNote,
-        onFindNotes: onFindNotes,
-      ),
+      home: noteId == null
+          ? const SizedBox.shrink()
+          : NotePage(
+              key: ValueKey(noteId),
+              controller: controller,
+              noteId: noteId!,
+              onClose: onClose,
+              closeRequests: closeRequests,
+              onNewNote: onNewNote,
+              onFindNotes: onFindNotes,
+            ),
     ),
   );
 }
 
-ThemeData betterNotesTheme(Brightness brightness) {
+final _themeCache = <(Brightness, bool), ThemeData>{};
+
+ThemeData betterNotesTheme(
+  Brightness brightness, {
+  bool highContrast = false,
+}) => _themeCache.putIfAbsent((
+  brightness,
+  highContrast,
+), () => _createBetterNotesTheme(brightness, highContrast: highContrast));
+
+ThemeData _createBetterNotesTheme(
+  Brightness brightness, {
+  required bool highContrast,
+}) {
   final scheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF795082),
     brightness: brightness,
     secondary: const Color(0xFFBD644B),
     tertiary: const Color(0xFF387F72),
+    contrastLevel: highContrast ? 1 : 0,
   );
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
+    focusColor: scheme.primary.withValues(alpha: 0.24),
     scaffoldBackgroundColor: brightness == Brightness.light
         ? const Color(0xFFFFFAF6)
         : const Color(0xFF1E1A21),

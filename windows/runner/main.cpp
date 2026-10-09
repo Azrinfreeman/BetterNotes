@@ -23,6 +23,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   SetCurrentProcessExplicitAppUserModelID(kBetterNotesAppId);
 
   flutter::DartProject project(L"data");
+  // Child engine creation runs on the Windows platform thread. Keep the main
+  // Flutter UI independent of that work, as we already do for note engines.
+  project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();

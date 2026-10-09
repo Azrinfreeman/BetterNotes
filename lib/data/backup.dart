@@ -1,0 +1,338 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:uuid/uuid.dart';
+
+import 'local_store.dart';
+import 'note.dart';
+
+const maxBackupBytes = 128 * 1024 * 1024;
+const maxBackupNotes = 5000;
+const maxBackupAssets = 10000;
+const _maxImageBytes = 8 * 1024 * 1024;
+const _maxNotesBytes = 16 * 1024 * 1024;
+final _idPattern = RegExp(r'^[A-Za-z0-9_-]{1,100}$');
+
+/// Schema 1 is an uncompressed ZIP: manifest.json, notes.json, `assets/<id>`.
+/// No files are extracted to disk. Every payload has a SHA-256 in the manifest.
+class BackupData {
+  BackupData(this.notes, this.assets, this.preferences);
+  final List<Note> notes;
+  final Map<String, Uint8List> assets;
+  final Map<String, Object> preferences;
+  int get trashCount => notes.where((note) => note.deleted).length;
+
+  Future<void> importInto(
+    LocalStore store,
+    String ownerId, {
+    bool restorePreferences = false,
+  }) async {
+    final assetIds = {for (final id in assets.keys) id: const Uuid().v4()};
+    final copies = [
+      for (final note in notes)
+        note.copyWith(
+          id: const Uuid().v4(),
+          ownerId: ownerId,
+          images: note.images.map((id) => assetIds[id]!).toList(),
+          delta: remapInlineImages(note.delta, assetIds),
+          revision: 0,
+          dirty: true,
+        ),
+    ];
+    await store.importCollection(copies, {
+      for (final entry in assets.entries) assetIds[entry.key]!: entry.value,
+    }, restorePreferences ? preferences : {});
+  }
+}
+
+class NoteBackup {
+  static Future<Uint8List> export(LocalStore store, String ownerId) async {
+    final notes = await store.notesFor(ownerId);
+    if (notes.length > maxBackupNotes) {
+      throw StateError('Backups support up to $maxBackupNotes notes.');
+    }
+    final entries = <String, Uint8List>{};
+    final noteJson = [
+      for (final note in notes) {...note.toJson(), 'owner_id': guestOwner},
+    ];
+    final encodedNotes = Uint8List.fromList(utf8.encode(jsonEncode(noteJson)));
+    if (encodedNotes.length > _maxNotesBytes) {
+      throw StateError('Note text exceeds the 16 MB backup limit.');
+    }
+    entries['notes.json'] = encodedNotes;
+    var total = encodedNotes.length;
+    final references = {
+      for (final note in notes) ...note.images,
+      for (final note in notes) ...inlineImageIds(note.delta),
+    };
+    if (references.length > maxBackupAssets) {
+      throw StateError('Too many images for one backup.');
+    }
+    for (final id in references) {
+      if (!_idPattern.hasMatch(id)) {
+        throw StateError('An image has an invalid ID.');
+      }
+      final bytes = await store.getImage(id);
+      if (bytes == null) {
+        throw StateError(
+          'An image is missing locally. Open the note to download it, then retry.',
+        );
+      }
+      if (bytes.length > _maxImageBytes) {
+        throw StateError('An image exceeds 8 MB.');
+      }
+      total += bytes.length;
+      if (total > maxBackupBytes - 1024 * 1024) {
+        throw StateError('Backup exceeds 128 MB.');
+      }
+      entries['assets/$id'] = bytes;
+    }
+    final preferences = <String, Object>{};
+    for (final key in [
+      'theme',
+      'confirmDelete',
+      'inlineImages',
+      'customWindowButtons',
+    ]) {
+      final value = await store.getSetting<Object>(key);
+      if (value != null) preferences[key] = value;
+    }
+    entries['manifest.json'] = Uint8List.fromList(
+      utf8.encode(
+        jsonEncode({
+          'format': 'BetterNotes',
+          'version': 1,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'hashes': {
+            for (final entry in entries.entries)
+              entry.key: sha256.convert(entry.value).toString(),
+          },
+          'preferences': preferences,
+        }),
+      ),
+    );
+    final archive = Archive();
+    for (final entry in entries.entries) {
+      archive.add(
+        ArchiveFile(entry.key, entry.value.length, entry.value)
+          ..compression = CompressionType.none,
+      );
+    }
+    final bytes = ZipEncoder().encodeBytes(archive);
+    if (bytes.length > maxBackupBytes) {
+      throw StateError('Backup exceeds 128 MB.');
+    }
+    // Do not advertise a successful backup that our importer cannot restore.
+    validate(bytes);
+    return bytes;
+  }
+
+  static BackupData validate(Uint8List bytes) {
+    try {
+      return _validate(bytes);
+    } on FormatException {
+      rethrow;
+    } catch (_) {
+      throw const FormatException(
+        'Invalid or truncated BetterNotes backup. Choose a complete exported ZIP.',
+      );
+    }
+  }
+
+  static BackupData _validate(Uint8List bytes) {
+    if (bytes.length > maxBackupBytes) {
+      throw const FormatException('Backup exceeds 128 MB.');
+    }
+    final directory = ZipDirectory()..read(InputMemoryStream(bytes));
+    if (directory.fileHeaders.length > maxBackupAssets + 2 ||
+        directory.fileHeaders.length !=
+            directory.totalCentralDirectoryEntries ||
+        directory.numberOfThisDisk != 0 ||
+        directory.diskWithTheStartOfTheCentralDirectory != 0) {
+      throw const FormatException('Invalid backup entry count.');
+    }
+    final entries = <String, Uint8List>{};
+    var total = 0;
+    for (final header in directory.fileHeaders) {
+      final name = header.filename;
+      final asset =
+          name.startsWith('assets/') && _idPattern.hasMatch(name.substring(7));
+      if ((!asset && name != 'manifest.json' && name != 'notes.json') ||
+          entries.containsKey(name)) {
+        throw const FormatException('Unexpected or duplicate archive path.');
+      }
+      // Schema 1 uses stored entries. Reject compressed/encrypted content before
+      // decoding, so declared sizes cannot hide a decompression bomb.
+      final file = header.file;
+      if (header.compressionMethod != 0 ||
+          header.generalPurposeBitFlag & 1 != 0 ||
+          header.compressedSize != header.uncompressedSize ||
+          file == null ||
+          file.flags & 1 != 0 ||
+          file.compressionMethod != CompressionType.none ||
+          file.filename != name ||
+          (header.externalFileAttributes >> 16) & 0xf000 == 0xa000) {
+        throw const FormatException(
+          'Unsupported compressed, encrypted, or linked backup entry.',
+        );
+      }
+      final limit = asset
+          ? _maxImageBytes
+          : name == 'manifest.json'
+          ? 2 * 1024 * 1024
+          : _maxNotesBytes;
+      total += header.uncompressedSize;
+      if (header.uncompressedSize > limit || total > maxBackupBytes) {
+        throw const FormatException('Backup entry exceeds its size limit.');
+      }
+      final content = file.getStream().toUint8List();
+      if (content.length != header.uncompressedSize ||
+          getCrc32(content) != header.crc32) {
+        throw const FormatException('Backup integrity check failed.');
+      }
+      entries[name] = content;
+    }
+    final manifestBytes = entries.remove('manifest.json');
+    if (manifestBytes == null) {
+      throw const FormatException('Backup manifest is missing.');
+    }
+    final manifest = jsonDecode(utf8.decode(manifestBytes)) as Map;
+    if (manifest['format'] != 'BetterNotes' || manifest['version'] != 1) {
+      throw const FormatException('Unsupported backup version.');
+    }
+    final hashes = manifest['hashes'] as Map;
+    if (hashes.length != entries.length) {
+      throw const FormatException('Backup manifest does not match its files.');
+    }
+    for (final entry in entries.entries) {
+      if (hashes[entry.key] != sha256.convert(entry.value).toString()) {
+        throw const FormatException('Backup SHA-256 check failed.');
+      }
+    }
+    final preferences = _preferences(manifest['preferences'] as Map? ?? {});
+    final rawNotes =
+        jsonDecode(utf8.decode(entries.remove('notes.json')!)) as List;
+    if (rawNotes.length > maxBackupNotes) {
+      throw const FormatException('Too many notes in backup.');
+    }
+    final assets = {
+      for (final entry in entries.entries) entry.key.substring(7): entry.value,
+    };
+    final ids = <String>{};
+    final notes = <Note>[];
+    for (final raw in rawNotes) {
+      final json = Map<String, dynamic>.from(raw as Map);
+      if ((json['title'] != null && json['title'] is! String) ||
+          (json['favorite'] != null && json['favorite'] is! bool) ||
+          (json['tags'] != null &&
+              (json['tags'] is! List ||
+                  (json['tags'] as List).any((tag) => tag is! String))) ||
+          (json['archived_at'] != null &&
+              (json['archived_at'] is! String ||
+                  DateTime.tryParse(json['archived_at'] as String) == null))) {
+        throw const FormatException('Invalid organization metadata.');
+      }
+      final id = json['id'] as String;
+      if (!_idPattern.hasMatch(id) || !ids.add(id)) {
+        throw const FormatException('Invalid or duplicate note ID.');
+      }
+      if (json['plain_text'] is! String ||
+          json['color_index'] is! int ||
+          json['revision'] is! int ||
+          json['deleted'] is! bool ||
+          json['dirty'] is! bool ||
+          json['images'] is! List ||
+          json['strokes'] is! List ||
+          (json['deleted_at'] != null &&
+              DateTime.tryParse(json['deleted_at'] as String) == null)) {
+        throw const FormatException('Invalid note fields.');
+      }
+      final delta = json['content'] as List;
+      if (delta.isEmpty || delta.length > 100000) {
+        throw const FormatException('Invalid rich-text document.');
+      }
+      for (final rawOp in delta) {
+        final op = rawOp as Map;
+        final insert = op['insert'];
+        if (op.keys.any((key) => key != 'insert' && key != 'attributes') ||
+            (insert is! String &&
+                !(insert is Map &&
+                    insert.length == 1 &&
+                    insert['image'] is String))) {
+          throw const FormatException('Unsupported rich-text operation.');
+        }
+        final attrs = op['attributes'];
+        if (attrs != null &&
+            (attrs is! Map ||
+                attrs.entries.any(
+                  (entry) =>
+                      entry.key is! String ||
+                      !(entry.value is String ||
+                          entry.value is num ||
+                          entry.value is bool ||
+                          entry.value == null),
+                ))) {
+          throw const FormatException('Invalid rich-text attributes.');
+        }
+      }
+      if (delta.last['insert'] is! String ||
+          !(delta.last['insert'] as String).endsWith('\n')) {
+        throw const FormatException('A note is missing its final paragraph.');
+      }
+      quill.Document.fromJson(delta);
+      final note = Note.fromJson({...json, 'owner_id': guestOwner});
+      if (note.colorIndex < 0 ||
+          note.images.toSet().length != note.images.length ||
+          note.images.length > maxBackupAssets ||
+          note.strokes.length > 10000) {
+        throw const FormatException('Invalid note content.');
+      }
+      if (!note.images.toSet().containsAll(inlineImageIds(delta))) {
+        throw const FormatException(
+          'An inline image is missing from its note.',
+        );
+      }
+      for (final imageId in note.images) {
+        if (!assets.containsKey(imageId)) {
+          throw const FormatException('An image is missing from the backup.');
+        }
+      }
+      var points = 0;
+      for (final stroke in note.strokes) {
+        points += stroke.points.length;
+        if (points > 1000000 ||
+            stroke.points.any(
+              (point) =>
+                  point.length != 2 || point.any((value) => !value.isFinite),
+            )) {
+          throw const FormatException('Invalid drawing data.');
+        }
+      }
+      notes.add(note);
+    }
+    return BackupData(notes, assets, preferences);
+  }
+
+  static Map<String, Object> _preferences(Map raw) {
+    final result = <String, Object>{};
+    for (final entry in raw.entries) {
+      if (entry.key == 'theme' &&
+          ['light', 'dark', 'system'].contains(entry.value)) {
+        result['theme'] = entry.value as String;
+      } else if ([
+            'confirmDelete',
+            'inlineImages',
+            'customWindowButtons',
+          ].contains(entry.key) &&
+          entry.value is bool) {
+        result[entry.key as String] = entry.value as bool;
+      } else {
+        throw const FormatException('Unsupported backup preference.');
+      }
+    }
+    return result;
+  }
+}
