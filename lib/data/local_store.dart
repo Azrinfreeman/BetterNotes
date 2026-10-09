@@ -17,6 +17,12 @@ class LocalStore {
   final _assets = stringMapStoreFactory.store('assets');
   final _settings = stringMapStoreFactory.store('settings');
 
+  static bool get canQuarantine => local_factory.canQuarantineLocalDatabase;
+
+  /// Moves an unreadable database aside without deleting it.
+  static Future<String?> quarantine() =>
+      local_factory.quarantineLocalDatabase();
+
   static Future<LocalStore> open() async =>
       LocalStore._(await local_factory.openLocalDatabase());
 

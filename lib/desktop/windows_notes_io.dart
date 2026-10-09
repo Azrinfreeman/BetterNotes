@@ -10,6 +10,8 @@ import 'package:window_manager/window_manager.dart';
 
 import '../data/note.dart';
 import '../state/note_editor_store.dart';
+export 'remote_note_editor_store.dart';
+import 'remote_note_editor_store.dart';
 import '../state/notes_controller.dart';
 
 Future<DesktopCoordinator> createDesktopCoordinator() async {
@@ -58,6 +60,7 @@ class DesktopCoordinator with WindowListener {
   final Set<String> _readyWindows = {};
   final Map<String, Completer<void>> _readyWaiters = {};
   WindowController? _idleWindow;
+  Timer? _refillTimer;
 
   bool get isNoteWindow => _parentId != null;
   bool get supportsNoteWindows => _window != null && !isNoteWindow;
@@ -71,6 +74,7 @@ class DesktopCoordinator with WindowListener {
     _mainController = controller;
     controller.flushDesktopEditors = flushChildren;
     controller.flushDesktopEditor = flushChild;
+    controller.applyFastNoteOpening = _applyFastOpening;
     final remembered =
         await controller.store.getSetting<List<dynamic>>('openNoteWindows') ??
         const [];
@@ -89,13 +93,40 @@ class DesktopCoordinator with WindowListener {
     await _restoreWindows();
     // Pay for one native engine before the library becomes interactive. Reuse
     // this bounded spare for the next open and park an editor when it closes.
+    if (controller.fastNoteOpening) await _warmSpare();
+    await runner.invokeMethod<void>('ready');
+  }
+
+  Future<void> _warmSpare() async {
     try {
-      final spare = await _createWindow(null, null);
-      _idleWindow = spare;
+      _idleWindow = await _createWindow(null, null);
     } catch (_) {
       // A spare is optional; normal opening remains available if warming fails.
     }
-    await runner.invokeMethod<void>('ready');
+  }
+
+  /// Creates or releases the idle editor when Fast note opening changes.
+  Future<void> _applyFastOpening() {
+    final operation = _openTail.then((_) async {
+      if (_shuttingDown) return;
+      if (_mainController!.fastNoteOpening) {
+        if (_idleWindow == null) await _warmSpare();
+        return;
+      }
+      final spare = _idleWindow;
+      if (spare == null) return;
+      _idleWindow = null;
+      _readyWindows.remove(spare.windowId);
+      _assignments.remove(spare.windowId);
+      _deliveredStates.remove(spare.windowId);
+      try {
+        await spare.invokeMethod<void>('close');
+      } catch (_) {
+        // The idle engine may already be gone.
+      }
+    });
+    _openTail = operation.then<void>((_) {}, onError: (_) {});
+    return operation;
   }
 
   Future<dynamic> _handleMainCall(MethodCall call) async {
@@ -192,7 +223,7 @@ class DesktopCoordinator with WindowListener {
           await _rememberOpenWindows();
           _assignments[id] = null;
           _deliveredStates.remove(id);
-          if (_idleWindow == null) {
+          if (_idleWindow == null && _mainController!.fastNoteOpening) {
             _idleWindow = WindowController.fromWindowId(id);
             return true;
           }
@@ -379,6 +410,21 @@ class DesktopCoordinator with WindowListener {
       await _rememberOpenWindows();
       rethrow;
     }
+    _scheduleSpareRefill();
+  }
+
+  /// Opening consumes the idle editor; warm a replacement shortly afterwards,
+  /// off the opening path, so the next note also opens quickly.
+  void _scheduleSpareRefill() {
+    if (_shuttingDown ||
+        _idleWindow != null ||
+        !(_mainController?.fastNoteOpening ?? false)) {
+      return;
+    }
+    _refillTimer?.cancel();
+    _refillTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!_shuttingDown) unawaited(_applyFastOpening());
+    });
   }
 
   void _broadcast() {
@@ -571,6 +617,7 @@ class DesktopCoordinator with WindowListener {
     if (_closing) return;
     _closing = true;
     _shuttingDown = true;
+    _refillTimer?.cancel();
     try {
       await _openTail;
       // First save every editor. If one fails, keep all windows available.
@@ -666,170 +713,4 @@ class DesktopCoordinator with WindowListener {
     await windowManager.setPreventClose(false);
     await windowManager.close();
   }
-}
-
-class RemoteNoteEditorStore extends NoteEditorStore {
-  RemoteNoteEditorStore(this._parent, this._noteId);
-
-  final WindowController _parent;
-  String? _noteId;
-  Note? _note;
-  @override
-  bool confirmDelete = true;
-  @override
-  bool syncing = false;
-  @override
-  bool signedIn = false;
-  @override
-  ThemeMode themeMode = ThemeMode.system;
-  @override
-  bool customWindowButtons = false;
-  @override
-  bool inlineImages = false;
-  @override
-  bool alwaysShowNoteHeader = false;
-
-  Future<void> load() async {
-    if (_noteId == null) return;
-    final state = await _parent.invokeMethod<Map<dynamic, dynamic>>(
-      'note_state',
-      _noteId,
-    );
-    if (state == null) throw StateError('Could not load the note window.');
-    applyState(Map<String, dynamic>.from(state));
-  }
-
-  void activate(String id, Map<String, dynamic> state) {
-    _note = null;
-    _noteId = id;
-    applyState(state);
-  }
-
-  void park() {
-    _noteId = null;
-    notifyListeners();
-  }
-
-  void unpark(String id) {
-    _noteId = id;
-    notifyListeners();
-  }
-
-  void applyState(Map<String, dynamic> state) {
-    final raw = state['note'];
-    final incoming = raw == null
-        ? null
-        : Note.fromJson(Map<String, dynamic>.from(raw));
-    // A broadcast/save response from the previous assignment may arrive after
-    // this engine is parked or switched to another note.
-    if (incoming != null && incoming.id != _noteId) return;
-    if (incoming == null ||
-        _note == null ||
-        !incoming.updatedAt.isBefore(_note!.updatedAt)) {
-      _note = incoming;
-    }
-    confirmDelete = state['confirmDelete'] as bool? ?? true;
-    syncing = state['syncing'] as bool? ?? false;
-    signedIn = state['signedIn'] as bool? ?? false;
-    customWindowButtons = state['customWindowButtons'] as bool? ?? false;
-    inlineImages = state['inlineImages'] as bool? ?? false;
-    alwaysShowNoteHeader = state['alwaysShowNoteHeader'] as bool? ?? false;
-    themeMode = switch (state['theme']) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
-    notifyListeners();
-  }
-
-  @override
-  Note? noteById(String id) => id == _noteId ? _note : null;
-
-  Future<void> _applyResponse(Future<Map<dynamic, dynamic>?> request) async {
-    final response = await request;
-    if (response == null) {
-      throw StateError('The main window did not acknowledge storage.');
-    }
-    applyState(Map<String, dynamic>.from(response));
-  }
-
-  @override
-  Future<void> save(Note note) async {
-    final previous = _note;
-    final changes = <String, dynamic>{'noteId': note.id};
-    if (previous == null || previous.title != note.title) {
-      changes['title'] = note.title;
-    }
-    if (previous == null || previous.favorite != note.favorite) {
-      changes['favorite'] = note.favorite;
-    }
-    if (previous == null || !listEquals(previous.tags, note.tags)) {
-      changes['tags'] = note.tags;
-    }
-    if (previous == null ||
-        jsonEncode(previous.delta) != jsonEncode(note.delta)) {
-      changes['delta'] = note.delta;
-      changes['plainText'] = note.plainText;
-    }
-    if (previous == null || previous.colorIndex != note.colorIndex) {
-      changes['colorIndex'] = note.colorIndex;
-    }
-    if (previous == null || !listEquals(previous.images, note.images)) {
-      changes['images'] = note.images;
-    }
-    if (previous == null ||
-        jsonEncode(previous.strokes.map((s) => s.toJson()).toList()) !=
-            jsonEncode(note.strokes.map((s) => s.toJson()).toList())) {
-      changes['strokes'] = note.strokes.map((s) => s.toJson()).toList();
-    }
-    if (changes.length == 1) return;
-    await _applyResponse(
-      _parent.invokeMethod<Map<dynamic, dynamic>>('save_note', changes),
-    );
-  }
-
-  @override
-  Future<void> delete(Note note) => _applyResponse(
-    _parent.invokeMethod<Map<dynamic, dynamic>>('delete_note', note.id),
-  );
-
-  @override
-  Future<void> restore(String id) => _applyResponse(
-    _parent.invokeMethod<Map<dynamic, dynamic>>('restore_note', id),
-  );
-
-  @override
-  Future<void> archive(String id, {bool archived = true}) {
-    if (!archived) throw UnsupportedError('Restore from the Archive view.');
-    return _applyResponse(
-      _parent.invokeMethod<Map<dynamic, dynamic>>('archive_note', id),
-    );
-  }
-
-  @override
-  Future<void> addImage(Note note, Uint8List bytes) => _applyResponse(
-    _parent.invokeMethod<Map<dynamic, dynamic>>('add_image', {
-      'noteId': note.id,
-      'bytes': bytes,
-    }),
-  );
-
-  @override
-  Future<String> cacheImage(Uint8List bytes) async {
-    final id = await _parent.invokeMethod<String>('cache_image', bytes);
-    if (id == null) throw StateError('Could not cache the image.');
-    return id;
-  }
-
-  @override
-  Future<void> removeImage(Note note, String imageId) => _applyResponse(
-    _parent.invokeMethod<Map<dynamic, dynamic>>('remove_image', {
-      'noteId': note.id,
-      'imageId': imageId,
-    }),
-  );
-
-  @override
-  Future<Uint8List?> image(String noteId, String imageId) => _parent
-      .invokeMethod<Uint8List>('image', {'noteId': noteId, 'imageId': imageId});
 }

@@ -15,9 +15,13 @@ import '../data/clipboard_image.dart';
 import '../data/note.dart';
 import '../state/note_editor_store.dart';
 import 'drawing_page.dart';
-import 'notes_home.dart';
+import 'find_bar.dart';
+import 'note_desktop_header.dart';
+import 'note_details_dialog.dart';
+import 'note_image_embed.dart';
 import 'shortcuts_help.dart';
 import 'text_color_dialog.dart';
+import 'text_style_panel.dart';
 
 class NotePage extends StatefulWidget {
   const NotePage({
@@ -54,6 +58,14 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
   int _matchIndex = -1;
   final Set<String> _inlineIds = {};
   bool _addingImage = false;
+  bool _secondaryPointer = false;
+
+  bool get _desktopEditorMenu =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
   Future<void>? _imageOperation;
   Timer? _saveTimer;
   bool _closing = false;
@@ -216,120 +228,19 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     _selectMatch();
   }
 
-  Widget _findBar() => Material(
-    color: Theme.of(context).colorScheme.surfaceContainer,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: CallbackShortcuts(
-              bindings: {
-                const SingleActivator(
-                  LogicalKeyboardKey.enter,
-                  shift: true,
-                ): () =>
-                    _nextMatch(-1),
-              },
-              child: TextField(
-                key: const ValueKey('find-in-note'),
-                controller: _findText,
-                focusNode: _findFocus,
-                decoration: const InputDecoration(
-                  hintText: 'Find in this note (Ctrl+H)',
-                  border: InputBorder.none,
-                ),
-                onChanged: (_) => _updateMatches(select: true),
-                onSubmitted: (_) {
-                  _nextMatch(1);
-                  _findFocus.requestFocus();
-                },
-              ),
-            ),
-          ),
-          Text(
-            _matches.isEmpty ? '0/0' : '${_matchIndex + 1}/${_matches.length}',
-            semanticsLabel: '${_matches.length} matches',
-          ),
-          IconButton(
-            tooltip: 'Previous match',
-            onPressed: _matches.isEmpty ? null : () => _nextMatch(-1),
-            icon: const Icon(Icons.keyboard_arrow_up),
-          ),
-          IconButton(
-            tooltip: 'Next match',
-            onPressed: _matches.isEmpty ? null : () => _nextMatch(1),
-            icon: const Icon(Icons.keyboard_arrow_down),
-          ),
-          IconButton(
-            tooltip: 'Close find',
-            onPressed: _dismissFind,
-            icon: const Icon(Icons.close),
-          ),
-        ],
-      ),
-    ),
-  );
-
   Future<void> _editDetails(Note note) async {
-    final title = TextEditingController(text: note.title);
-    final tags = TextEditingController(text: note.tags.join(', '));
     try {
-      final accepted = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Title and tags'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  key: const ValueKey('note-title'),
-                  controller: title,
-                  maxLength: 200,
-                  decoration: const InputDecoration(
-                    labelText: 'Title (optional)',
-                    hintText: 'Uses the first text line when blank',
-                  ),
-                ),
-                TextField(
-                  key: const ValueKey('note-tags'),
-                  controller: tags,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    hintText: 'work, ideas, personal',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      );
-      if (accepted != true) return;
+      final details = await showNoteDetailsDialog(context, note);
+      if (details == null) return;
       await _flush();
       final current = widget.controller.noteById(note.id);
       if (current != null) {
         await widget.controller.save(
-          current.copyWith(title: title.text, tags: tags.text.split(',')),
+          current.copyWith(title: details.title, tags: details.tags.split(',')),
         );
       }
     } catch (error) {
       if (mounted) _message('Could not save details: $error');
-    } finally {
-      // Let the dialog finish its closing animation before disposing fields.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      title.dispose();
-      tags.dispose();
     }
   }
 
@@ -376,142 +287,21 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     const PopupMenuDivider(),
   ];
 
-  PreferredSizeWidget _desktopHeader(Note note) => PreferredSize(
-    preferredSize: const Size.fromHeight(48),
-    child: MouseRegion(
-      key: const ValueKey('note-header-hover'),
-      onEnter: (_) {
-        _headerHovered = true;
-        _showHeader();
-      },
-      onExit: (_) {
-        _headerHovered = false;
-        _hideHeaderLater();
-      },
-      child: Focus(
-        canRequestFocus: false,
-        onFocusChange: (focused) {
-          _headerFocused = focused;
-          if (focused) {
-            _showHeader();
-          } else {
-            _hideHeaderLater();
-          }
-        },
-        child: AnimatedOpacity(
-          key: const ValueKey('note-header-opacity'),
-          opacity: _headerVisible || _keepHeaderVisible ? 1 : 0,
-          alwaysIncludeSemantics: true,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          child: IgnorePointer(
-            ignoring: !_headerVisible && !_keepHeaderVisible,
-            child: Material(
-              color: Color(noteColors[note.colorIndex % noteColors.length]),
-              child: IconButtonTheme(
-                data: IconButtonThemeData(
-                  style: IconButton.styleFrom(
-                    foregroundColor: const Color(0xFF2E2631),
-                  ),
-                ),
-                child: IconTheme(
-                  data: const IconThemeData(color: Color(0xFF2E2631)),
-                  child: SizedBox(
-                    height: 48,
-                    child: Row(
-                      children: [
-                        if (widget.onNewNote != null)
-                          IconButton(
-                            tooltip: 'New note',
-                            onPressed: widget.onNewNote,
-                            icon: const Icon(Icons.add),
-                          ),
-                        Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onPanStart: (_) =>
-                                unawaited(windowManager.startDragging()),
-                            onDoubleTap: () async {
-                              if (await windowManager.isMaximized()) {
-                                await windowManager.unmaximize();
-                              } else {
-                                await windowManager.maximize();
-                              }
-                            },
-                            child: Semantics(
-                              label: note.displayTitle,
-                              child: const SizedBox.expand(),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Change color',
-                          onPressed: () => _changeColor(note),
-                          icon: const Icon(Icons.palette_outlined),
-                        ),
-                        IconButton(
-                          tooltip: _alwaysOnTop
-                              ? 'Turn off always on top'
-                              : 'Always on top',
-                          isSelected: _alwaysOnTop,
-                          onPressed: _toggleAlwaysOnTop,
-                          icon: const Icon(Icons.push_pin_outlined),
-                          selectedIcon: const Icon(Icons.push_pin),
-                        ),
-                        PopupMenuButton<String>(
-                          tooltip: 'More actions',
-                          onOpened: () => _setHeaderBusy(true),
-                          onCanceled: () => _setHeaderBusy(false),
-                          onSelected: (value) async {
-                            try {
-                              if (value == 'share') {
-                                await SharePlus.instance.share(
-                                  ShareParams(text: note.textForExport),
-                                );
-                              } else if (value == 'delete') {
-                                await _delete(note);
-                              } else if (value == 'minimize') {
-                                await windowManager.minimize();
-                              } else {
-                                await _organizationAction(value, note);
-                              }
-                            } finally {
-                              if (mounted) _setHeaderBusy(false);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            ..._organizationItems(note),
-                            const PopupMenuItem(
-                              value: 'minimize',
-                              child: Text('Minimize'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'share',
-                              child: Text('Share text'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete note'),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          tooltip: 'Close note',
-                          onPressed: _close,
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
+  Future<void> _headerMenuAction(String value, Note note) async {
+    try {
+      if (value == 'share') {
+        await SharePlus.instance.share(ShareParams(text: note.textForExport));
+      } else if (value == 'delete') {
+        await _delete(note);
+      } else if (value == 'minimize') {
+        await windowManager.minimize();
+      } else {
+        await _organizationAction(value, note);
+      }
+    } finally {
+      if (mounted) _setHeaderBusy(false);
+    }
+  }
 
   void _onExternalClose() => unawaited(_close());
 
@@ -773,11 +563,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     try {
       final image = await ImagePicker().pickImage(source: source);
       if (image == null) return;
-      final bytes = await image.readAsBytes();
-      if (bytes.length > maxNoteImageBytes) {
-        if (mounted) _message('Choose an image under 8 MB.');
-        return;
-      }
+      final bytes = await prepareNoteImage(await image.readAsBytes());
       await _addImage(bytes);
     } catch (error) {
       if (mounted) _message('Could not add image: $error');
@@ -940,7 +726,44 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
             autofocus: true,
             child: Scaffold(
               appBar: _desktopNote
-                  ? _desktopHeader(note)
+                  ? NoteDesktopHeader(
+                      note: note,
+                      visible: _headerVisible || _keepHeaderVisible,
+                      alwaysOnTop: _alwaysOnTop,
+                      menuItems: [
+                        ..._organizationItems(note),
+                        const PopupMenuItem(
+                          value: 'minimize',
+                          child: Text('Minimize'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'share',
+                          child: Text('Share text'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete note'),
+                        ),
+                      ],
+                      onHover: (hovered) {
+                        _headerHovered = hovered;
+                        hovered ? _showHeader() : _hideHeaderLater();
+                      },
+                      onFocusChange: (focused) {
+                        _headerFocused = focused;
+                        focused ? _showHeader() : _hideHeaderLater();
+                      },
+                      onNewNote: widget.onNewNote == null
+                          ? null
+                          : () => unawaited(widget.onNewNote!()),
+                      onChangeColor: () => _changeColor(note),
+                      onToggleAlwaysOnTop: _toggleAlwaysOnTop,
+                      onMenuOpened: () => _setHeaderBusy(true),
+                      onMenuCanceled: () => _setHeaderBusy(false),
+                      onMenuSelected: (value) =>
+                          unawaited(_headerMenuAction(value, note)),
+                      onClose: _close,
+                    )
                   : AppBar(
                       leading: IconButton(
                         tooltip: 'Close note',
@@ -1003,7 +826,17 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                       constraints: const BoxConstraints(maxWidth: 790),
                       child: Column(
                         children: [
-                          if (_finding) _findBar(),
+                          if (_finding)
+                            FindBar(
+                              textController: _findText,
+                              focusNode: _findFocus,
+                              matches: _matches.length,
+                              index: _matchIndex,
+                              onQueryChanged: () =>
+                                  _updateMatches(select: true),
+                              onStep: _nextMatch,
+                              onClose: _dismissFind,
+                            ),
                           Expanded(
                             child: ListView(
                               padding: const EdgeInsets.all(20),
@@ -1011,7 +844,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                 for (final imageId in note.images.where(
                                   (id) => !_inlineIds.contains(id),
                                 ))
-                                  _NoteImageCard(
+                                  NoteImageCard(
                                     controller: widget.controller,
                                     noteId: note.id,
                                     imageId: imageId,
@@ -1026,67 +859,97 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                     strokes: note.strokes,
                                     onTap: () => _editInk(note),
                                   ),
-                                SizedBox(
-                                  height: 420,
-                                  child: quill.QuillEditor.basic(
-                                    key: _quillKey,
-                                    controller: _editor,
-                                    focusNode: _editorFocus,
-                                    config: quill.QuillEditorConfig(
-                                      contextMenuBuilder: (context, state) =>
-                                          AdaptiveTextSelectionToolbar.buttonItems(
-                                            anchors: state.contextMenuAnchors,
-                                            buttonItems: [
-                                              ...state.contextMenuButtonItems,
-                                              if (!_editor
-                                                  .selection
-                                                  .isCollapsed)
-                                                ContextMenuButtonItem(
-                                                  label: 'Change color',
-                                                  onPressed: () {
-                                                    state.hideToolbar();
-                                                    _chooseTextColor(
-                                                      quill.Attribute.color,
-                                                    );
-                                                  },
-                                                ),
-                                            ],
+                                Listener(
+                                  onPointerDown: (event) => _secondaryPointer =
+                                      event.kind == PointerDeviceKind.mouse &&
+                                      event.buttons == kSecondaryMouseButton,
+                                  onPointerUp: (event) {
+                                    if (!_secondaryPointer ||
+                                        !_desktopEditorMenu) {
+                                      return;
+                                    }
+                                    _secondaryPointer = false;
+                                    // Let Quill finish selecting the clicked word.
+                                    final position = event.position;
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (mounted) {
+                                            unawaited(
+                                              _showEditorMenu(position),
+                                            );
+                                          }
+                                        });
+                                    WidgetsBinding.instance.scheduleFrame();
+                                  },
+                                  child: SizedBox(
+                                    height: 420,
+                                    child: quill.QuillEditor.basic(
+                                      key: _quillKey,
+                                      controller: _editor,
+                                      focusNode: _editorFocus,
+                                      config: quill.QuillEditorConfig(
+                                        // Windows/desktop uses _showEditorMenu: its
+                                        // popup route is reliable in note windows,
+                                        // where the overlay menu ignored clicks.
+                                        contextMenuBuilder: (context, state) =>
+                                            _desktopEditorMenu
+                                            ? const SizedBox.shrink()
+                                            : AdaptiveTextSelectionToolbar.buttonItems(
+                                                anchors:
+                                                    state.contextMenuAnchors,
+                                                buttonItems: [
+                                                  ...state
+                                                      .contextMenuButtonItems,
+                                                  if (!_editor
+                                                      .selection
+                                                      .isCollapsed)
+                                                    ContextMenuButtonItem(
+                                                      label: 'Change color',
+                                                      onPressed: () {
+                                                        state.hideToolbar();
+                                                        _chooseTextColor(
+                                                          quill.Attribute.color,
+                                                        );
+                                                      },
+                                                    ),
+                                                ],
+                                              ),
+                                        embedBuilders: [
+                                          NoteImageEmbedBuilder(
+                                            store: widget.controller,
+                                            noteId: note.id,
+                                            onRemove: _removeInlineImage,
                                           ),
-                                      embedBuilders: [
-                                        _NoteImageEmbedBuilder(
-                                          store: widget.controller,
-                                          noteId: note.id,
-                                          onRemove: _removeInlineImage,
-                                        ),
-                                      ],
-                                      placeholder: 'Write a note...',
-                                      padding: const EdgeInsets.all(4),
-                                      // Resolve Windows Backspace in the editor's
-                                      // own Actions scope, including held-key repeats.
-                                      customShortcuts:
-                                          !kIsWeb &&
-                                              defaultTargetPlatform ==
-                                                  TargetPlatform.windows
-                                          ? const {
-                                              SingleActivator(
-                                                LogicalKeyboardKey.backspace,
-                                              ): DeleteCharacterIntent(
-                                                forward: false,
-                                              ),
-                                              SingleActivator(
-                                                LogicalKeyboardKey.backspace,
-                                                shift: true,
-                                              ): DeleteCharacterIntent(
-                                                forward: false,
-                                              ),
-                                              SingleActivator(
-                                                LogicalKeyboardKey.backspace,
-                                                control: true,
-                                              ): DeleteToNextWordBoundaryIntent(
-                                                forward: false,
-                                              ),
-                                            }
-                                          : null,
+                                        ],
+                                        placeholder: 'Write a note...',
+                                        padding: const EdgeInsets.all(4),
+                                        // Resolve Windows Backspace in the editor's
+                                        // own Actions scope, including held-key repeats.
+                                        customShortcuts:
+                                            !kIsWeb &&
+                                                defaultTargetPlatform ==
+                                                    TargetPlatform.windows
+                                            ? const {
+                                                SingleActivator(
+                                                  LogicalKeyboardKey.backspace,
+                                                ): DeleteCharacterIntent(
+                                                  forward: false,
+                                                ),
+                                                SingleActivator(
+                                                  LogicalKeyboardKey.backspace,
+                                                  shift: true,
+                                                ): DeleteCharacterIntent(
+                                                  forward: false,
+                                                ),
+                                                SingleActivator(
+                                                  LogicalKeyboardKey.backspace,
+                                                  control: true,
+                                                ): DeleteToNextWordBoundaryIntent(
+                                                  forward: false,
+                                                ),
+                                              }
+                                            : null,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1140,7 +1003,11 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                     multiRowsDisplay: true,
                                   ),
                                 ),
-                                if (_showTextStyle) _textStyleToolbar(),
+                                if (_showTextStyle)
+                                  TextStylePanel(
+                                    editor: _editor,
+                                    onChooseColor: _chooseTextColor,
+                                  ),
                                 Row(
                                   children: [
                                     IconButton(
@@ -1234,75 +1101,96 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     },
   );
 
-  Widget _textStyleToolbar() => ConstrainedBox(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .25,
-    ),
-    child: SingleChildScrollView(
-      key: const ValueKey('text-style-panel'),
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Select text to style it, or choose a style before typing.',
-          ),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              quill.QuillToolbarFontSizeButton(
-                controller: _editor,
-                options: const quill.QuillToolbarFontSizeButtonOptions(
-                  items: {
-                    'Default': '0',
-                    '12': '12',
-                    '14': '14',
-                    '16': '16',
-                    '18': '18',
-                    '24': '24',
-                    '32': '32',
-                    '48': '48',
-                  },
-                  defaultItemColor: null,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Text color',
-                icon: const Icon(Icons.format_color_text),
-                onPressed: () => _chooseTextColor(quill.Attribute.color),
-              ),
-              IconButton(
-                tooltip: 'Highlight color',
-                icon: const Icon(Icons.format_color_fill),
-                onPressed: () => _chooseTextColor(quill.Attribute.background),
-              ),
-              quill.QuillToolbarSelectHeaderStyleDropdownButton(
-                controller: _editor,
-              ),
-              quill.QuillToolbarToggleStyleButton(
-                controller: _editor,
-                attribute: quill.Attribute.ol,
-              ),
-              quill.QuillToolbarToggleStyleButton(
-                controller: _editor,
-                attribute: quill.Attribute.blockQuote,
-              ),
-              quill.QuillToolbarToggleStyleButton(
-                controller: _editor,
-                attribute: quill.Attribute.inlineCode,
-              ),
-              quill.QuillToolbarClearFormatButton(controller: _editor),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Future<void> _chooseTextColor(quill.Attribute attribute) async {
+  Future<void> _showEditorMenu(Offset position) async {
     final selection = _editor.selection;
+    final hasSelection = selection.isValid && !selection.isCollapsed;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'cut',
+          enabled: hasSelection,
+          child: const Text('Cut'),
+        ),
+        PopupMenuItem(
+          value: 'copy',
+          enabled: hasSelection,
+          child: const Text('Copy'),
+        ),
+        const PopupMenuItem(value: 'paste', child: Text('Paste')),
+        const PopupMenuItem(value: 'all', child: Text('Select all')),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'color',
+          enabled: hasSelection,
+          child: const Text('Change color'),
+        ),
+        PopupMenuItem(
+          value: 'highlight',
+          enabled: hasSelection,
+          child: const Text('Highlight color'),
+        ),
+      ],
+    );
+    if (choice == null || !mounted) return;
+    try {
+      if (_editor.selection != selection && selection.isValid) {
+        _editor.updateSelection(selection, quill.ChangeSource.local);
+      }
+      switch (choice) {
+        case 'cut':
+          // ignore: experimental_member_use
+          _editor.clipboardSelection(false);
+        case 'copy':
+          // ignore: experimental_member_use
+          _editor.clipboardSelection(true);
+        case 'paste':
+          // ignore: experimental_member_use
+          await _editor.clipboardPaste();
+        case 'all':
+          _editor.updateSelection(
+            TextSelection(
+              baseOffset: 0,
+              extentOffset: _editor.document.length - 1,
+            ),
+            quill.ChangeSource.local,
+          );
+        case 'color':
+          await _chooseTextColor(quill.Attribute.color, selection);
+        case 'highlight':
+          await _chooseTextColor(quill.Attribute.background, selection);
+      }
+    } catch (error) {
+      if (mounted) _message('Could not complete that action: $error');
+    }
+    if (mounted) _editorFocus.requestFocus();
+  }
+
+  Future<void> _chooseTextColor(
+    quill.Attribute attribute, [
+    TextSelection? knownSelection,
+  ]) async {
+    try {
+      await _pickTextColor(attribute, knownSelection);
+    } catch (error) {
+      if (mounted) _message('Could not change text color: $error');
+    }
+  }
+
+  Future<void> _pickTextColor(
+    quill.Attribute attribute,
+    TextSelection? knownSelection,
+  ) async {
+    final selection = knownSelection ?? _editor.selection;
+    if (!_editor.selection.isValid || _editor.selection != selection) {
+      _editor.updateSelection(selection, quill.ChangeSource.local);
+    }
     final color = await showTextColorDialog(
       context,
       title: attribute.key == quill.Attribute.color.key
@@ -1334,101 +1222,4 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       }
     }
   }
-}
-
-class _NoteImageEmbedBuilder extends quill.EmbedBuilder {
-  const _NoteImageEmbedBuilder({
-    required this.store,
-    required this.noteId,
-    required this.onRemove,
-  });
-
-  final NoteEditorStore store;
-  final String noteId;
-  final void Function(int) onRemove;
-
-  @override
-  String get key => quill.BlockEmbed.imageType;
-
-  @override
-  Widget build(BuildContext context, quill.EmbedContext embedContext) =>
-      _NoteImageCard(
-        controller: store,
-        noteId: noteId,
-        imageId: embedContext.node.value.data as String,
-        inline: true,
-        onRemove: () => onRemove(embedContext.node.documentOffset),
-      );
-}
-
-class _NoteImageCard extends StatelessWidget {
-  const _NoteImageCard({
-    required this.controller,
-    required this.noteId,
-    required this.imageId,
-    required this.onRemove,
-    this.inline = false,
-  });
-
-  final NoteEditorStore controller;
-  final String noteId;
-  final String imageId;
-  final VoidCallback onRemove;
-  final bool inline;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    key: ValueKey('${inline ? 'inline' : 'above'}-image-$imageId'),
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Stack(
-      children: [
-        InkWell(
-          onTap: () => showDialog<void>(
-            context: context,
-            builder: (context) => Dialog(
-              child: SizedBox(
-                width: MediaQuery.sizeOf(context).width * 0.9,
-                height: MediaQuery.sizeOf(context).height * 0.75,
-                child: NoteImage(
-                  controller: controller,
-                  noteId: noteId,
-                  imageId: imageId,
-                ),
-              ),
-            ),
-          ),
-          child: inline
-              ? ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: 64,
-                    maxHeight: 300,
-                  ),
-                  child: NoteImage(
-                    controller: controller,
-                    noteId: noteId,
-                    imageId: imageId,
-                  ),
-                )
-              : SizedBox(
-                  height: 180,
-                  width: double.infinity,
-                  child: NoteImage(
-                    controller: controller,
-                    noteId: noteId,
-                    imageId: imageId,
-                  ),
-                ),
-        ),
-        Positioned(
-          right: 5,
-          top: 5,
-          child: IconButton.filledTonal(
-            tooltip: 'Remove image',
-            icon: const Icon(Icons.close),
-            onPressed: onRemove,
-          ),
-        ),
-      ],
-    ),
-  );
 }

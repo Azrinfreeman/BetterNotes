@@ -4,6 +4,7 @@ import 'package:better_notes/data/note.dart';
 import 'package:better_notes/main.dart';
 import 'package:better_notes/state/notes_controller.dart';
 import 'package:better_notes/ui/note_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -39,6 +40,63 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('Windows right click opens a popup menu that changes color', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final (db, store, note) = (await tester.runAsync(() async {
+      final db = await databaseFactoryMemory.openDatabase('ctx-windows');
+      final store = NotesController(LocalStore.fromDatabase(db), null);
+      await store.load();
+      final note = await store.create();
+      await store.save(
+        note.copyWith(
+          plainText: 'Hello rest',
+          delta: [
+            {'insert': 'Hello rest\n'},
+          ],
+        ),
+      );
+      return (db, store, note);
+    }))!;
+    await tester.pumpWidget(_app(store, note.id));
+    await tester.pumpAndSettle();
+    final editorWidget = find.byType(quill.QuillEditor);
+    final editor = tester.widget<quill.QuillEditor>(editorWidget).controller;
+    final origin = tester.getTopLeft(editorWidget);
+    final drag = await tester.startGesture(
+      origin + const Offset(8, 15),
+      kind: PointerDeviceKind.mouse,
+    );
+    await drag.moveTo(origin + const Offset(60, 15));
+    await drag.up();
+    await tester.pumpAndSettle();
+    final click = await tester.startGesture(
+      origin + const Offset(30, 15),
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await click.up();
+    await tester.pumpAndSettle();
+    expect(find.text('Highlight color'), findsOneWidget);
+    await tester.tap(find.text('Change color'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Hex color'),
+      '123ABC',
+    );
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+    final ops = editor.document.toDelta().toJson();
+    expect(ops.first['attributes'], {'color': '#123ABC'});
+    expect(ops.first['insert'], hasLength(3));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    store.dispose();
+    await tester.runAsync(db.close);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('right click changes only selected text color', (tester) async {
     final (db, store, note) = (await tester.runAsync(() async {
       final db = await databaseFactoryMemory.openDatabase('context-color');

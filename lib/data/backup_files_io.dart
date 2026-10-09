@@ -7,12 +7,21 @@ import 'package:share_plus/share_plus.dart';
 import 'backup.dart';
 
 bool get canImportBackup =>
-    Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    Platform.isWindows ||
+    Platform.isLinux ||
+    Platform.isMacOS ||
+    Platform.isAndroid ||
+    Platform.isIOS;
 
 Future<Uint8List?> pickBackup() async {
   final file = await FileSelectorPlatform.instance.openFile(
     acceptedTypeGroups: const [
-      XTypeGroup(label: 'BetterNotes backup', extensions: ['zip']),
+      XTypeGroup(
+        label: 'BetterNotes backup',
+        extensions: ['zip'],
+        mimeTypes: ['application/zip'],
+        uniformTypeIdentifiers: ['public.zip-archive'],
+      ),
     ],
   );
   if (file == null) return null;

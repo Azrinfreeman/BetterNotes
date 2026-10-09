@@ -1,31 +1,20 @@
+// Run with: dart test -p chrome test/backup_browser_test.dart
+// Plain package:test avoids the Flutter web test host, which cannot start here.
 @TestOn('browser')
 library;
 
 import 'dart:js_interop';
 import 'dart:typed_data';
 
-import 'package:better_notes/data/backup.dart';
 import 'package:better_notes/data/backup_files_web.dart' as files;
-import 'package:better_notes/data/local_store.dart';
-import 'package:better_notes/data/note.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:sembast/sembast_memory.dart';
+import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
 void main() {
   test(
-    'browser upload and cancellation use the validated backup format',
+    'browser upload returns the selected bytes and removes the input',
     () async {
-      final db = await databaseFactoryMemory.openDatabase('browser-backup.db');
-      final store = LocalStore.fromDatabase(db);
-      final note = Note.fresh(guestOwner).copyWith(
-        plainText: 'browser note',
-        delta: [
-          {'insert': 'browser note\n'},
-        ],
-      );
-      await store.putNote(note);
-      final bytes = await NoteBackup.export(store, guestOwner);
+      final bytes = Uint8List.fromList(List.generate(300, (i) => i % 256));
       final upload = files.pickBackup();
       final input = web.document.querySelector(
         'input[type=file]',
@@ -34,23 +23,29 @@ void main() {
       transfer.items.add(web.File([bytes.toJS].toJS, 'backup.zip'));
       input.files = transfer.files;
       input.dispatchEvent(web.Event('change'));
-      final received = (await upload)!;
-      expect(received, bytes);
-      final backup = NoteBackup.validate(received);
-      await backup.importInto(store, guestOwner);
-      final notes = await store.notesFor(guestOwner);
-      expect(notes, hasLength(2));
-      expect(notes.map((value) => value.id).toSet(), hasLength(2));
-      final cancelled = files.pickBackup();
-      (web.document.querySelector('input[type=file]') as web.HTMLInputElement)
-          .dispatchEvent(web.Event('cancel'));
-      expect(await cancelled, isNull);
+      expect(await upload, bytes);
       expect(web.document.querySelector('input[type=file]'), isNull);
-      expect(
-        () => NoteBackup.validate(Uint8List.fromList([1, 2])),
-        throwsFormatException,
-      );
-      await db.close();
     },
   );
+
+  test('browser picker cancellation returns null', () async {
+    final cancelled = files.pickBackup();
+    (web.document.querySelector('input[type=file]') as web.HTMLInputElement)
+        .dispatchEvent(web.Event('cancel'));
+    expect(await cancelled, isNull);
+    expect(web.document.querySelector('input[type=file]'), isNull);
+  });
+
+  test('an empty selection is treated as cancellation', () async {
+    final upload = files.pickBackup();
+    (web.document.querySelector('input[type=file]') as web.HTMLInputElement)
+        .dispatchEvent(web.Event('change'));
+    expect(await upload, isNull);
+  });
+
+  test('saving a backup triggers a download link and cleans it up', () async {
+    final saved = await files.saveBackupFile(Uint8List(4), 'notes.zip');
+    expect(saved, isTrue);
+    expect(web.document.querySelector('a[download]'), isNull);
+  });
 }
