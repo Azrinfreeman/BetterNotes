@@ -1,9 +1,15 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/sign_in.dart';
+import '../data/backup.dart';
+import '../data/backup_files.dart' as backup_files;
 import '../desktop/auto_start.dart';
 import '../desktop/window_chrome.dart';
 import '../state/notes_controller.dart';
+import 'shortcuts_help.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.controller});
@@ -17,6 +23,104 @@ class _SettingsPageState extends State<SettingsPage> {
   bool? _autoStartEnabled;
   bool _loadingAutoStart = false;
   bool _savingAutoStart = false;
+  bool _workingFiles = false;
+
+  Future<void> _fileAction(Future<String?> Function() action) async {
+    if (_workingFiles) return;
+    setState(() => _workingFiles = true);
+    try {
+      final message = await action();
+      if (mounted && message != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File operation failed: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _workingFiles = false);
+    }
+  }
+
+  Future<String?> _exportBackup() async {
+    final bytes = await widget.controller.exportBackup();
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+    final saved = await backup_files.saveBackupFile(
+      bytes,
+      'BetterNotes-backup-$date.zip',
+    );
+    return saved
+        ? 'Backup exported. Keep this readable file in a safe place.'
+        : null;
+  }
+
+  Future<String?> _exportText() async {
+    final text = await widget.controller.exportText();
+    final saved = await backup_files.saveBackupFile(
+      Uint8List.fromList(utf8.encode(text)),
+      'BetterNotes-notes.txt',
+      mimeType: 'text/plain',
+    );
+    return saved
+        ? 'Text exported. Use a complete backup to restore images and formatting.'
+        : null;
+  }
+
+  Future<String?> _importBackup() async {
+    final owner = widget.controller.ownerId;
+    final bytes = await backup_files.pickBackup();
+    if (bytes == null) return null;
+    final backup = await compute(NoteBackup.validate, bytes);
+    if (!mounted) return null;
+    var preferences = false;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Import backup as copies?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${backup.notes.length} notes (${backup.trashCount} in Trash), ${backup.assets.length} images.\n\nExisting notes are kept. Importing the same backup again creates more copies.',
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Restore appearance and editor preferences',
+                  ),
+                  value: preferences,
+                  onChanged: (value) =>
+                      setDialogState(() => preferences = value ?? false),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Import copies'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true) return null;
+    await widget.controller.importBackup(
+      backup,
+      restorePreferences: preferences,
+      expectedOwner: owner,
+    );
+    return 'Imported ${backup.notes.length} note copies.';
+  }
 
   @override
   void initState() {
@@ -63,7 +167,9 @@ class _SettingsPageState extends State<SettingsPage> {
     animation: widget.controller,
     builder: (context, _) => Scaffold(
       appBar: AppBar(
-        title: const WindowTitle(child: Text('Settings')),
+        title: const WindowTitle(
+          child: Text('Settings', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
         actions: const [WindowButtons(), SizedBox(width: 8)],
       ),
       body: ListView(
@@ -127,21 +233,33 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.brightness_6_outlined),
-            title: const Text('Appearance'),
-            trailing: DropdownButton<ThemeMode>(
-              value: widget.controller.themeMode,
-              onChanged: (mode) {
-                if (mode != null) widget.controller.setTheme(mode);
-              },
-              items: const [
-                DropdownMenuItem(
-                  value: ThemeMode.system,
-                  child: Text('System'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Appearance'),
+                DropdownButton<ThemeMode>(
+                  isExpanded: true,
+                  value: widget.controller.themeMode,
+                  onChanged: (mode) {
+                    if (mode != null) widget.controller.setTheme(mode);
+                  },
+                  items: const [
+                    DropdownMenuItem(
+                      value: ThemeMode.system,
+                      child: Text('System'),
+                    ),
+                    DropdownMenuItem(
+                      value: ThemeMode.light,
+                      child: Text('Light'),
+                    ),
+                    DropdownMenuItem(
+                      value: ThemeMode.dark,
+                      child: Text('Dark'),
+                    ),
+                  ],
                 ),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
               ],
             ),
           ),
@@ -193,31 +311,61 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           if (AutoStart.isSupported) ...[
             const Divider(),
-            ListTile(
-              leading: const Icon(Icons.web_asset_outlined),
-              title: const Text('Window buttons'),
-              subtitle: const Text('Applies to all BetterNotes windows.'),
-              trailing: DropdownButton<bool>(
-                value: widget.controller.customWindowButtons,
-                onChanged: (value) async {
-                  if (value == null) return;
-                  try {
-                    await widget.controller.setCustomWindowButtons(value);
-                  } catch (error) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Could not save window buttons: $error',
-                          ),
+            SwitchListTile(
+              secondary: const Icon(Icons.visibility_outlined),
+              title: const Text('Always show note header'),
+              subtitle: const Text(
+                'Keep note actions visible without hovering.',
+              ),
+              value: widget.controller.alwaysShowNoteHeader,
+              onChanged: (value) async {
+                try {
+                  await widget.controller.setAlwaysShowNoteHeader(value);
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Could not save header preference: $error',
                         ),
-                      );
-                    }
+                      ),
+                    );
                   }
-                },
-                items: const [
-                  DropdownMenuItem(value: false, child: Text('Windows')),
-                  DropdownMenuItem(value: true, child: Text('BetterNotes')),
+                }
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Window buttons'),
+                  const Text('Applies to all BetterNotes windows.'),
+                  DropdownButton<bool>(
+                    key: const ValueKey('window-buttons'),
+                    isExpanded: true,
+                    value: widget.controller.customWindowButtons,
+                    onChanged: (value) async {
+                      if (value == null) return;
+                      try {
+                        await widget.controller.setCustomWindowButtons(value);
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Could not save window buttons: $error',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(value: false, child: Text('Windows')),
+                      DropdownMenuItem(value: true, child: Text('BetterNotes')),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -249,6 +397,53 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
           ],
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('Backup and restore'),
+            subtitle: const Text(
+              'Complete backups include Trash, formatting, images, and drawings. Exported files are readable and unencrypted.',
+            ),
+            trailing: _workingFiles
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(),
+                  )
+                : null,
+          ),
+          ListTile(
+            leading: const Icon(Icons.file_download_outlined),
+            title: const Text('Export complete backup'),
+            onTap: _workingFiles ? null : () => _fileAction(_exportBackup),
+          ),
+          ListTile(
+            leading: const Icon(Icons.file_upload_outlined),
+            title: const Text('Import backup'),
+            subtitle: backup_files.canImportBackup
+                ? const Text(
+                    'Review and add copies without replacing existing notes.',
+                  )
+                : const Text('Import is available on desktop and web.'),
+            enabled: !_workingFiles && backup_files.canImportBackup,
+            onTap: _workingFiles || !backup_files.canImportBackup
+                ? null
+                : () => _fileAction(_importBackup),
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Export active notes as text'),
+            subtitle: const Text(
+              'Text only; use a complete backup for restoration.',
+            ),
+            onTap: _workingFiles ? null : () => _fileAction(_exportText),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.keyboard_outlined),
+            title: const Text('Keyboard shortcuts'),
+            subtitle: const Text('Editing, search, and window controls.'),
+            onTap: () => showShortcutsHelp(context),
+          ),
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('BetterNotes'),

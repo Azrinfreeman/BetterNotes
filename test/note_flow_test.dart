@@ -375,6 +375,8 @@ void main() {
     final editor = tester.widget<quill.QuillEditor>(
       find.byType(quill.QuillEditor),
     );
+    editor.focusNode.requestFocus();
+    await tester.pump();
     editor.controller.updateSelection(
       const TextSelection(baseOffset: 0, extentOffset: 5),
       quill.ChangeSource.local,

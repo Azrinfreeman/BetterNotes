@@ -202,12 +202,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.widgetWithText(ListTile, 'Window buttons'),
-          matching: find.byType(DropdownButton<bool>),
-        ),
-      );
+      final windowButtons = find.byKey(const ValueKey('window-buttons'));
+      await tester.ensureVisible(windowButtons);
+      await tester.pumpAndSettle();
+      await tester.tap(windowButtons);
       await tester.pumpAndSettle();
       await tester.tap(find.text('BetterNotes').last);
       await tester.pumpAndSettle();
@@ -253,12 +251,9 @@ void main() {
 
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.widgetWithText(ListTile, 'Window buttons'),
-          matching: find.byType(DropdownButton<bool>),
-        ),
-      );
+      await tester.ensureVisible(windowButtons);
+      await tester.pumpAndSettle();
+      await tester.tap(windowButtons);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Windows').last);
       await tester.pumpAndSettle();

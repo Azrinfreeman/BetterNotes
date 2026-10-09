@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -54,6 +53,10 @@ class CloudSync {
           colorIndex: local.colorIndex,
           images: copiedImages,
           strokes: local.strokes,
+          title: local.title,
+          favorite: local.favorite,
+          tags: local.tags,
+          archivedAt: local.archivedAt,
         );
         await store.putNote(conflict);
         await _saveAcknowledged(local, server);
@@ -120,14 +123,7 @@ class CloudSync {
         ]);
         // Keep the local bytes available to an open editor's undo/redo history.
       }
-      if (local.deleted) {
-        for (final imageId in local.images) {
-          await client.storage.from('note-assets').remove([
-            '$ownerId/${local.id}/$imageId',
-          ]);
-          await store.deleteImage(imageId);
-        }
-      }
+      // Trash retains its image bytes and remote references for restoration.
     }
 
     for (final incoming in remote.values) {
@@ -142,16 +138,7 @@ class CloudSync {
   ) => client.storage.from('note-assets').download('$ownerId/$noteId/$imageId');
 
   Future<void> _saveAcknowledged(Note snapshot, Note server) async {
-    final current = await store.noteById(snapshot.id);
-    if (current == null) {
-      await store.putNote(server);
-      return;
-    }
-    if (jsonEncode(current.toJson()) != jsonEncode(snapshot.toJson())) {
-      await store.putNote(current.copyWith(revision: server.revision));
-      return;
-    }
-    await store.putNote(server);
+    await store.acknowledgeRemote(snapshot, server);
   }
 }
 
