@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/cloud_sync.dart';
+import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup.dart';
 import '../data/local_store.dart';
 import '../data/note.dart';
@@ -90,6 +91,15 @@ class NotesController extends NoteEditorStore {
   NoteSort noteSort = NoteSort.updated;
   List<String> selectedTags = [];
   bool compactView = false;
+  String? autoBackupFolder;
+  int autoBackupKeep = 7;
+  DateTime? autoBackupLast;
+  String? autoBackupError;
+  bool autoBackupRunning = false;
+  Timer? _autoBackupTimer;
+
+  /// How often an automatic backup is due.
+  Duration autoBackupInterval = const Duration(hours: 24);
   List<SavedFilter> savedFilters = const [];
   int trashRetentionDays = 0;
   Future<void>? _writes;
@@ -270,6 +280,11 @@ class NotesController extends NoteEditorStore {
   bool alwaysShowNoteHeader = false;
   bool fastNoteOpening = true;
   Future<void> Function()? applyFastNoteOpening;
+  Future<void> Function()? applyTray;
+  Future<void> Function()? applyQuickCapture;
+  bool keepInTray = false;
+  String quickCaptureKey = 'off';
+  String? quickCaptureError;
   @override
   bool syncing = false;
   String? syncError;
@@ -331,6 +346,16 @@ class NotesController extends NoteEditorStore {
     _lastOwner = ownerId;
     if (signedIn) await store.moveGuestNotes(ownerId);
     trashRetentionDays = await store.getSetting<int>('trashRetentionDays') ?? 0;
+    keepInTray = await store.getSetting<bool>('keepInTray') ?? false;
+    quickCaptureKey =
+        await store.getSetting<String>('quickCaptureKey') ?? 'off';
+    autoBackupFolder = await store.getSetting<String>('autoBackupFolder');
+    autoBackupKeep = await store.getSetting<int>('autoBackupKeep') ?? 7;
+    autoBackupError = await store.getSetting<String>('autoBackupError');
+    autoBackupLast = DateTime.tryParse(
+      await store.getSetting<String>('autoBackupLast') ?? '',
+    );
+    _scheduleAutoBackup();
     savedFilters = [
       for (final value
           in await store.getSetting<List>('savedFilters') ?? const [])
@@ -739,6 +764,101 @@ class NotesController extends NoteEditorStore {
     notifyListeners();
   }
 
+  void _scheduleAutoBackup() {
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
+    if (autoBackupFolder == null || !auto_backup.canAutoBackup) return;
+    _autoBackupTimer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => unawaited(runAutoBackup()),
+    );
+    // Give startup a moment before the first check.
+    unawaited(Future<void>.delayed(const Duration(seconds: 20), runAutoBackup));
+  }
+
+  Future<void> setAutoBackupFolder(String? folder) async {
+    if (folder == null) {
+      await store.deleteSetting('autoBackupFolder');
+    } else {
+      await store.setSetting('autoBackupFolder', folder);
+    }
+    autoBackupFolder = folder;
+    autoBackupError = null;
+    await store.deleteSetting('autoBackupError');
+    notifyListeners();
+    _scheduleAutoBackup();
+  }
+
+  Future<void> setAutoBackupKeep(int keep) async {
+    await store.setSetting('autoBackupKeep', keep);
+    autoBackupKeep = keep;
+    notifyListeners();
+  }
+
+  /// Writes a backup to the chosen folder when one is due (or [force]d).
+  /// Failures are recorded for the library and Settings to show.
+  Future<bool> runAutoBackup({bool force = false}) async {
+    final folder = autoBackupFolder;
+    if (folder == null || autoBackupRunning || !auto_backup.canAutoBackup) {
+      return false;
+    }
+    final last = autoBackupLast;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < autoBackupInterval) {
+      return false;
+    }
+    autoBackupRunning = true;
+    notifyListeners();
+    try {
+      final bytes = await exportBackup();
+      final now = DateTime.now();
+      await auto_backup.writeAutoBackup(folder, bytes, now, autoBackupKeep);
+      autoBackupLast = now;
+      autoBackupError = null;
+      await store.setSetting('autoBackupLast', now.toUtc().toIso8601String());
+      await store.deleteSetting('autoBackupError');
+      return true;
+    } catch (error) {
+      autoBackupError = 'Automatic backup failed: $error';
+      await store.setSetting('autoBackupError', autoBackupError!);
+      return false;
+    } finally {
+      autoBackupRunning = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setKeepInTray(bool value) async {
+    final previous = keepInTray;
+    keepInTray = value;
+    try {
+      await applyTray?.call();
+      await store.setSetting('keepInTray', value);
+    } catch (_) {
+      keepInTray = previous;
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  /// Registers the shortcut first so a conflict leaves the old choice intact.
+  Future<void> setQuickCaptureKey(String id) async {
+    final previous = quickCaptureKey;
+    quickCaptureKey = id;
+    try {
+      await applyQuickCapture?.call();
+      await store.setSetting('quickCaptureKey', id);
+      quickCaptureError = null;
+    } catch (_) {
+      quickCaptureKey = previous;
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
+
   Future<void> setTrashRetentionDays(int days) async {
     await store.setSetting('trashRetentionDays', days);
     trashRetentionDays = days;
@@ -939,6 +1059,7 @@ class NotesController extends NoteEditorStore {
   @override
   void dispose() {
     _poll?.cancel();
+    _autoBackupTimer?.cancel();
     _debounce?.cancel();
     _authSubscription?.cancel();
     super.dispose();
