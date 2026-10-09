@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/cloud_sync.dart';
+import '../data/app_log.dart';
 import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup.dart';
 import '../data/local_store.dart';
@@ -326,6 +327,7 @@ class NotesController extends NoteEditorStore {
 
   void reportSaveFailure(String message) {
     saveFailure = message;
+    AppLog.write('ERROR', 'Save problem', message);
     notifyListeners();
   }
 
@@ -851,6 +853,7 @@ class NotesController extends NoteEditorStore {
       return true;
     } catch (error) {
       autoBackupError = 'Automatic backup failed: $error';
+      AppLog.write('ERROR', 'Automatic backup failed', error);
       await store.setSetting('autoBackupError', autoBackupError!);
       return false;
     } finally {
@@ -913,8 +916,9 @@ class NotesController extends NoteEditorStore {
   Future<void> _notifyRemindersChanged() async {
     try {
       await remindersChanged?.call();
-    } catch (_) {
+    } catch (error) {
       // The scheduled task is best effort; the in-app check still works.
+      AppLog.write('WARN', 'Reminder task update failed', error);
     }
   }
 

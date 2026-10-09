@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/note.dart';
+import '../l10n/l10n.dart';
 import '../state/note_editor_store.dart';
 import 'note_cards.dart' show reminderTime;
 
@@ -12,19 +13,23 @@ class ReminderPreset {
 }
 
 /// Quick choices relative to [now] (local time): shorter ones first.
-List<ReminderPreset> reminderPresets(DateTime now) {
+List<ReminderPreset> reminderPresets(DateTime now, [AppLocalizations? l10n]) {
+  final l = l10n ?? currentL10n();
   DateTime at(DateTime day, int hour) =>
       DateTime(day.year, day.month, day.day, hour);
   final tomorrow = now.add(const Duration(days: 1));
   final daysToMonday = (DateTime.monday - now.weekday + 7) % 7;
   final monday = now.add(Duration(days: daysToMonday == 0 ? 7 : daysToMonday));
   return [
-    ReminderPreset('In 10 minutes', now.add(const Duration(minutes: 10))),
-    ReminderPreset('In 1 hour', now.add(const Duration(hours: 1))),
+    ReminderPreset(
+      l.reminderPresetTenMinutes,
+      now.add(const Duration(minutes: 10)),
+    ),
+    ReminderPreset(l.reminderPresetOneHour, now.add(const Duration(hours: 1))),
     if (at(now, 18).isAfter(now.add(const Duration(minutes: 30))))
-      ReminderPreset('This evening (6 PM)', at(now, 18)),
-    ReminderPreset('Tomorrow morning (9 AM)', at(tomorrow, 9)),
-    ReminderPreset('Next Monday (9 AM)', at(monday, 9)),
+      ReminderPreset(l.reminderPresetEvening, at(now, 18)),
+    ReminderPreset(l.reminderPresetTomorrow, at(tomorrow, 9)),
+    ReminderPreset(l.reminderPresetMonday, at(monday, 9)),
   ];
 }
 
@@ -46,6 +51,7 @@ class _ReminderDialog extends StatelessWidget {
   Future<void> _apply(BuildContext context, DateTime? at) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     try {
       await store.setReminder(note.id, at);
       navigator.pop();
@@ -53,8 +59,8 @@ class _ReminderDialog extends StatelessWidget {
         SnackBar(
           content: Text(
             at == null
-                ? 'Reminder cleared.'
-                : 'Reminder set for ${reminderTime(at)}.',
+                ? l10n.reminderCleared
+                : l10n.reminderSetSnack(reminderTime(at)),
           ),
         ),
       );
@@ -90,7 +96,7 @@ class _ReminderDialog extends StatelessWidget {
     );
     if (!at.isAfter(now)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose a time in the future.')),
+        SnackBar(content: Text(context.l10n.reminderChooseFuture)),
       );
       return;
     }
@@ -101,7 +107,7 @@ class _ReminderDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final current = note.remindAt;
     return AlertDialog(
-      title: const Text('Reminder'),
+      title: Text(context.l10n.reminderTitle),
       content: SizedBox(
         width: 360,
         child: SingleChildScrollView(
@@ -114,12 +120,15 @@ class _ReminderDialog extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     note.reminderFired
-                        ? 'Shown ${reminderTime(current)}'
-                        : 'Set for ${reminderTime(current)}',
+                        ? context.l10n.reminderShownAt(reminderTime(current))
+                        : context.l10n.reminderSetFor(reminderTime(current)),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
-              for (final preset in reminderPresets(DateTime.now()))
+              for (final preset in reminderPresets(
+                DateTime.now(),
+                context.l10n,
+              ))
                 ListTile(
                   dense: true,
                   leading: const Icon(Icons.alarm_add_outlined),
@@ -130,17 +139,12 @@ class _ReminderDialog extends StatelessWidget {
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.edit_calendar_outlined),
-                title: const Text('Pick date and time…'),
+                title: Text(context.l10n.reminderPickDateTime),
                 onTap: () => _pick(context),
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Reminders are best effort. BetterNotes must be running, or '
-                  'the scheduled-task option in Settings turned on; a reminder '
-                  'missed while the PC was off is shown the next time the app '
-                  'starts.',
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(context.l10n.reminderBestEffort),
               ),
             ],
           ),
@@ -150,11 +154,11 @@ class _ReminderDialog extends StatelessWidget {
         if (current != null)
           TextButton(
             onPressed: () => _apply(context, null),
-            child: const Text('Clear reminder'),
+            child: Text(context.l10n.reminderClear),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(context.l10n.reminderClose),
         ),
       ],
     );
@@ -196,7 +200,7 @@ class ReminderBanner extends StatelessWidget {
             children: [
               Icon(Icons.alarm_on_outlined, color: scheme.onTertiaryContainer),
               Text(
-                'Reminder',
+                context.l10n.reminderTitle,
                 style: TextStyle(
                   color: scheme.onTertiaryContainer,
                   fontWeight: FontWeight.w700,
@@ -204,21 +208,27 @@ class ReminderBanner extends StatelessWidget {
               ),
               PopupMenuButton<DateTime>(
                 key: const ValueKey('snooze'),
-                tooltip: 'Snooze',
+                tooltip: context.l10n.reminderSnooze,
                 onSelected: (at) => _set(context, at),
                 itemBuilder: (_) => [
-                  for (final preset in reminderPresets(DateTime.now()))
+                  for (final preset in reminderPresets(
+                    DateTime.now(),
+                    context.l10n,
+                  ))
                     PopupMenuItem(value: preset.at, child: Text(preset.label)),
                 ],
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Text('Snooze'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Text(context.l10n.reminderSnooze),
                 ),
               ),
               TextButton(
                 key: const ValueKey('reminder-done'),
                 onPressed: () => _set(context, null),
-                child: const Text('Done'),
+                child: Text(context.l10n.reminderDone),
               ),
             ],
           ),

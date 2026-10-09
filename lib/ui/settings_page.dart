@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app_info.dart';
 import '../auth/sign_in.dart';
 import '../data/backup.dart';
 import '../data/auto_backup.dart' as auto_backup;
@@ -12,6 +13,8 @@ import '../desktop/auto_start.dart';
 import '../desktop/tray.dart';
 import '../desktop/window_chrome.dart';
 import '../state/notes_controller.dart';
+import '../l10n/l10n.dart';
+import 'about_page.dart';
 import 'shortcuts_help.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -685,10 +688,15 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: const Text('Editing, search, and window controls.'),
             onTap: () => showShortcutsHelp(context),
           ),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('BetterNotes'),
-            subtitle: Text('A colorful home for little ideas.'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: Text(context.l10n.aboutTitle),
+            subtitle: Text(context.l10n.settingsAboutSubtitle(appVersionLabel)),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AboutPage(controller: widget.controller),
+              ),
+            ),
           ),
         ],
       ),

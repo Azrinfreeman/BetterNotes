@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:intl/intl.dart';
+
 import '../data/note.dart';
+import '../l10n/l10n.dart';
 import '../state/note_editor_store.dart';
 import '../state/notes_controller.dart';
 import 'note_page.dart';
@@ -541,25 +544,27 @@ class NoteCard extends StatelessWidget {
 String reminderTime(DateTime date) {
   final local = date.toLocal();
   final now = DateTime.now();
-  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
-  final clock =
-      '$hour:${local.minute.toString().padLeft(2, '0')} ${local.hour < 12 ? 'AM' : 'PM'}';
+  final l10n = currentL10n();
+  final clock = DateFormat.jm().format(local);
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(local.year, local.month, local.day);
   final diff = day.difference(today).inDays;
-  if (diff == 0) return 'Today $clock';
-  if (diff == 1) return 'Tomorrow $clock';
-  final year = local.year == now.year ? '' : ' ${local.year}';
-  return '${local.day} ${_months[local.month - 1]}$year $clock';
+  if (diff == 0) return l10n.reminderToday(clock);
+  if (diff == 1) return l10n.reminderTomorrow(clock);
+  final dayText = local.year == now.year
+      ? DateFormat.MMMd().format(local)
+      : DateFormat.yMMMd().format(local);
+  return l10n.reminderOn(dayText, clock);
 }
 
 /// Short reminder text for cards, or null when the note has none.
 String? reminderLabel(Note note) {
   final at = note.remindAt;
   if (at == null) return null;
+  final l10n = currentL10n();
   return note.reminderFired
-      ? 'Reminder shown ${reminderTime(at)}'
-      : 'Reminder ${reminderTime(at)}';
+      ? l10n.reminderCardShown(reminderTime(at))
+      : l10n.reminderCardLabel(reminderTime(at));
 }
 
 String noteTime(DateTime date) {
@@ -568,26 +573,10 @@ String noteTime(DateTime date) {
   if (local.year == now.year &&
       local.month == now.month &&
       local.day == now.day) {
-    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    return '$hour:${local.minute.toString().padLeft(2, '0')} ${local.hour < 12 ? 'AM' : 'PM'}';
+    return DateFormat.jm().format(local);
   }
-  return '${local.day} ${_months[local.month - 1]}';
+  return DateFormat.MMMd().format(local);
 }
-
-const _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 class NoteImage extends StatefulWidget {
   const NoteImage({

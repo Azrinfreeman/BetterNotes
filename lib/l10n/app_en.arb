@@ -1,0 +1,54 @@
+{
+  "@@locale": "en",
+
+  "aboutTitle": "About BetterNotes",
+  "aboutTagline": "A colorful home for little ideas.",
+  "aboutVersion": "Version {version} (build {build})",
+  "@aboutVersion": {
+    "placeholders": { "version": { "type": "String" }, "build": { "type": "String" } }
+  },
+  "aboutDataTitle": "Notes data",
+  "aboutDataBrowser": "Stored in this browser.",
+  "aboutLogTitle": "Log file",
+  "aboutLogNone": "No log file on this platform.",
+  "aboutCopyDiagnostics": "Copy diagnostics",
+  "aboutDiagnosticsCopied": "Diagnostics copied. They contain no note text.",
+  "aboutPrivacy": "BetterNotes keeps notes and a small error log on this device. It collects no usage data and sends nothing without your sign-in and sync settings. Diagnostics hold versions, counts, and settings states only, never note text.",
+  "settingsAboutSubtitle": "Version {version} · diagnostics and data location",
+  "@settingsAboutSubtitle": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+
+  "reminderTitle": "Reminder",
+  "reminderShownAt": "Shown {time}",
+  "@reminderShownAt": { "placeholders": { "time": { "type": "String" } } },
+  "reminderSetFor": "Set for {time}",
+  "@reminderSetFor": { "placeholders": { "time": { "type": "String" } } },
+  "reminderPickDateTime": "Pick date and time…",
+  "reminderBestEffort": "Reminders are best effort. BetterNotes must be running, or the scheduled-task option in Settings turned on; a reminder missed while the PC was off is shown the next time the app starts.",
+  "reminderClear": "Clear reminder",
+  "reminderClose": "Close",
+  "reminderCleared": "Reminder cleared.",
+  "reminderSetSnack": "Reminder set for {time}.",
+  "@reminderSetSnack": { "placeholders": { "time": { "type": "String" } } },
+  "reminderChooseFuture": "Choose a time in the future.",
+  "reminderSnooze": "Snooze",
+  "reminderDone": "Done",
+  "reminderPresetTenMinutes": "In 10 minutes",
+  "reminderPresetOneHour": "In 1 hour",
+  "reminderPresetEvening": "This evening (6 PM)",
+  "reminderPresetTomorrow": "Tomorrow morning (9 AM)",
+  "reminderPresetMonday": "Next Monday (9 AM)",
+  "reminderToday": "Today {time}",
+  "@reminderToday": { "placeholders": { "time": { "type": "String" } } },
+  "reminderTomorrow": "Tomorrow {time}",
+  "@reminderTomorrow": { "placeholders": { "time": { "type": "String" } } },
+  "reminderOn": "{date} {time}",
+  "@reminderOn": {
+    "placeholders": { "date": { "type": "String" }, "time": { "type": "String" } }
+  },
+  "reminderCardLabel": "Reminder {time}",
+  "@reminderCardLabel": { "placeholders": { "time": { "type": "String" } } },
+  "reminderCardShown": "Reminder shown {time}",
+  "@reminderCardShown": { "placeholders": { "time": { "type": "String" } } }
+}
