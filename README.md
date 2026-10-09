@@ -62,7 +62,7 @@ Use a note's **More actions → Title and tags** to set an optional title and co
 
 Titles, favorites, tags, Archive and library preferences currently remain local. Complete backup/import transfers note metadata; the existing configured cloud schema continues syncing body content without these new organization fields. The 20261009 portable ZIP includes the three implementation phases; older ZIPs predate them. Build and package verification are recorded in `STATUS.md`.
 
-Backups are readable, unencrypted ZIPs. Limits are 128 MB per backup, 5,000 notes, 10,000 images, 8 MB per image, and 16 MB of note JSON. Keep a complete exported ZIP; recompressing its contents is unsupported. Desktop and web support file import/export; mobile currently shares exports, with file import pending. Tokens, other accounts, startup registration, and window bounds are excluded.
+Backups are readable, unencrypted ZIPs. Limits are 128 MB per backup, 5,000 notes, 10,000 images, 8 MB per image, and 16 MB of note JSON. Keep a complete exported ZIP; recompressing its contents is unsupported. Desktop, web, Android, and iOS support file import (mobile import is untested on devices); mobile export uses the share sheet. Tokens, other accounts, startup registration, and window bounds are excluded.
 
 All three approved phases are implemented and included in the 20261009 portable package. Older packages are preserved; see `STATUS.md` for Windows build and package verification.
 

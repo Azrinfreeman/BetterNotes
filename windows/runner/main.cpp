@@ -9,6 +9,39 @@
 #include "jump_list.h"
 #include "utils.h"
 
+namespace {
+
+constexpr UINT kTrimCheckMs = 5000;
+constexpr int kIdleChecksBeforeTrim = 6;    // About 30 seconds in background.
+constexpr int kChecksBetweenRepeats = 60;   // Then at most every five minutes.
+
+// Every note window is its own Flutter engine in this one process. While no
+// BetterNotes window has been in the foreground for a while, move the process's
+// idle pages to Windows' standby list. They fault back in cheaply on use, and
+// the memory is available to other apps meanwhile.
+void CALLBACK TrimWhenInBackground(HWND, UINT, UINT_PTR, DWORD) {
+  static int background_checks = 0;
+  DWORD foreground_process = 0;
+  if (HWND foreground = ::GetForegroundWindow()) {
+    ::GetWindowThreadProcessId(foreground, &foreground_process);
+  }
+  if (foreground_process == ::GetCurrentProcessId()) {
+    background_checks = 0;
+    return;
+  }
+  ++background_checks;
+  if (background_checks == kIdleChecksBeforeTrim ||
+      background_checks == kIdleChecksBeforeTrim + kChecksBetweenRepeats) {
+    ::SetProcessWorkingSetSize(::GetCurrentProcess(), static_cast<SIZE_T>(-1),
+                               static_cast<SIZE_T>(-1));
+    if (background_checks > kIdleChecksBeforeTrim) {
+      background_checks = kIdleChecksBeforeTrim;
+    }
+  }
+}
+
+}  // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   // Attach to console when present (e.g., 'flutter run') or create a
@@ -54,6 +87,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
+  ::SetTimer(nullptr, 0, kTrimCheckMs, TrimWhenInBackground);
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

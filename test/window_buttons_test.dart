@@ -203,7 +203,7 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       final windowButtons = find.byKey(const ValueKey('window-buttons'));
-      await tester.ensureVisible(windowButtons);
+      await tester.scrollUntilVisible(windowButtons, 200);
       await tester.pumpAndSettle();
       await tester.tap(windowButtons);
       await tester.pumpAndSettle();
@@ -251,7 +251,7 @@ void main() {
 
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(windowButtons);
+      await tester.scrollUntilVisible(windowButtons, 200);
       await tester.pumpAndSettle();
       await tester.tap(windowButtons);
       await tester.pumpAndSettle();

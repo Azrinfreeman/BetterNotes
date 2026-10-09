@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-import 'backup.dart';
+import 'backup_limits.dart';
 
 bool get canImportBackup => true;
 

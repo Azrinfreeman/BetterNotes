@@ -7,9 +7,11 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:uuid/uuid.dart';
 
 import 'local_store.dart';
+import 'backup_limits.dart';
 import 'note.dart';
 
-const maxBackupBytes = 128 * 1024 * 1024;
+export 'backup_limits.dart';
+
 const maxBackupNotes = 5000;
 const maxBackupAssets = 10000;
 const _maxImageBytes = 8 * 1024 * 1024;

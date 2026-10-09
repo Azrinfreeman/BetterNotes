@@ -13,6 +13,7 @@ import 'desktop/windows_notes_stub.dart'
 import 'state/note_editor_store.dart';
 import 'state/notes_controller.dart';
 import 'ui/note_page.dart';
+import 'ui/startup_error.dart';
 import 'ui/notes_home.dart';
 import 'desktop/window_chrome.dart';
 
@@ -23,6 +24,11 @@ Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   final windows = await desktop.createDesktopCoordinator();
   if (windows.isNoteWindow) {
+    // Every note window is its own engine; keep decoded images from each one
+    // well below Flutter's 100 MB default so many open notes stay light.
+    PaintingBinding.instance.imageCache
+      ..maximumSizeBytes = 24 << 20
+      ..maximumSize = 50;
     final remote = await windows.createRemote();
     runApp(
       AnimatedBuilder(
@@ -42,6 +48,13 @@ Future<void> main(List<String> arguments) async {
     });
     return;
   }
+  await _launchMain(windows, arguments);
+}
+
+Future<void> _launchMain(
+  desktop.DesktopCoordinator windows,
+  List<String> arguments,
+) async {
   SupabaseClient? cloud;
   if (_supabaseUrl.isNotEmpty && _supabaseKey.isNotEmpty) {
     await Supabase.initialize(
@@ -53,8 +66,29 @@ Future<void> main(List<String> arguments) async {
     );
     cloud = Supabase.instance.client;
   }
-  final controller = NotesController(await LocalStore.open(), cloud);
-  await controller.load();
+  LocalStore? store;
+  final NotesController controller;
+  try {
+    store = await LocalStore.open();
+    controller = NotesController(store, cloud);
+    await controller.load();
+  } catch (error, stack) {
+    try {
+      await store?.database.close();
+    } catch (_) {
+      // The handle may already be unusable; recovery only needs it released.
+    }
+    runApp(
+      StartupErrorApp(
+        error: error,
+        stack: stack,
+        canReset: LocalStore.canQuarantine,
+        onReset: LocalStore.quarantine,
+        onRetry: () => _launchMain(windows, arguments),
+      ),
+    );
+    return;
+  }
   await windows.bindMain(controller);
   runApp(
     BetterNotesApp(

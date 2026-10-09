@@ -1,4 +1,104 @@
-# BetterNotes — offline usefulness, polish, and performance plan
+# BetterNotes — next-round plan: harden, polish, extend (proposal)
+
+**Proposed on 2026-10-09. Planning only — nothing below is implemented, and no scope is approved yet.** Choose rounds (or individual items) before any code changes. The roadmap that follows this section (offline usefulness plan) is complete and kept as history.
+
+## Round A status (2026-10-09)
+
+Implemented and committed: A2 image downscaling, A3 synthetic scale tests plus release measurements, A4 Fast note opening switch (plus spare refill and background memory trim found by A3), A5 Chrome tests via `dart test -p chrome`, A6 mobile import in source (not device-tested), A7 recovery screen for an unreadable library, A8 file splits. A1 was validated live by the user; it exposed and fixed the right-click menu (now a popup menu on desktop). Still open from Round A: mobile device/Android/iOS builds, scaling and screen-reader checks. Details are in `STATUS.md`.
+
+## Where the app stands
+
+Version 1.0.2+3 on `main` (`9f2f9c0`). Local-first Windows/web app with rich text, text styling, images/ink, titles, favorites, tags, archive, checklists, find-in-note, Trash/Undo, validated backup/import, accessibility work, and a bounded reusable note-window engine. Recorded checks: clean analysis, 59-test suite (plus four later focused tests), Windows release build, and a limited native smoke test. Items marked *(verify)* below are hypotheses from reading `STATUS.md` and file sizes, not confirmed defects; the first step of each is to confirm or discard it.
+
+## Guiding priorities
+
+1. Prove what exists works on a real desktop before adding scope (the largest gap is live validation, not missing features).
+2. Remove data-loss and "silent failure" risks before adding conveniences.
+3. Add features that make daily capture/retrieval faster, and that fit the sticky-note identity.
+4. Keep cloud work as a separate track gated on the owner's Supabase/Google configuration.
+
+## Round A — Validate and harden (recommended first; small code, high value)
+
+| # | Item | Why / what | Effort |
+| --- | --- | --- | --- |
+| A1 | **Live Windows validation pass** | Manually check on the release build: right-click **Change color**, held Backspace, Ctrl+V image paste, archive/delete with open windows, main-window shutdown with several notes, 100/150/200% display scaling, Narrator on library and editor. Record results; fix only what fails. | Small–medium (mostly manual) |
+| A2 | **Large-image safety** *(verify)* | Backup limits are 8 MB per image, 128 MB total. Confirm pasted/picked/camera images are downscaled or recompressed on attach; otherwise a note can be saved but later make **export** fail or the store grow without bound. Add bounded downscale (e.g., longest side ≤ 2048 px) and a clear export message naming the offending note. | Small–medium |
+| A3 | **Large-note and large-library profiling** | Profile/release run with 1,000–5,000 synthetic notes, a 50k-character note, image-heavy notes, and 1 vs 10 windows. Record startup, frame times, memory (including the idle spare editor). Fix only measured bottlenecks. | Medium |
+| A4 | **Spare-engine memory control** | The warm spare trades memory for open speed. Add a Settings switch (**Fast note opening**, default on) and measure its idle cost; off = cold open. | Small |
+| A5 | **Browser test harness** | Web tests are blocked by CanvasKit 404s from the test server. Diagnose (pre-fetch SDK assets or run against `flutter build web` output) so `backup_browser_test.dart` and web import/export actually execute. | Small–medium |
+| A6 | **Mobile backup import** | Mobile can export but not import (selector has no mobile implementation). Evaluate adding a mobile file picker (new dependency decision) or `file_selector_android/ios`; reuse the existing validator. Needs an Android SDK to build. | Medium |
+| A7 | **Error and edge-case sweep** | Corrupt local database on launch (offer open-backup/reset instead of blank app), disk full, locked database from a second instance, very long tag lists, empty-title/emoji handling, clock changes. Add failure-injection tests. | Medium |
+| A8 | **Code health** *(verify)* | `note_page.dart` (~1,430 lines), `notes_home.dart` (~1,150), and `windows_notes_io.dart` (~830) are large. Split along existing seams (toolbar, find bar, text-style panel, card widgets, window bridge) with no behavior change, behind the existing tests. | Medium |
+
+**Acceptance:** each item either has a recorded pass/fail result or a regression test; no unverified claim carried forward.
+
+## Round B — Everyday capture and retrieval
+
+| # | Feature | Behavior | Effort |
+| --- | --- | --- | --- |
+| B1 | **Duplicate note and templates** | Duplicate with fresh IDs and remapped image/inline references (reuse import remapping). Built-in templates: daily tasks, meeting, idea, shopping. New note ▸ From template. | Small–medium |
+| B2 | **Tag manager** | Rename, merge, and delete tags across notes; tag counts; autocomplete from existing tags. | Small–medium |
+| B3 | **Multi-select and bulk actions** | Long-press/Ctrl+click select; bulk favorite, archive, tag, color, trash, export. | Medium |
+| B4 | **Link handling** | Auto-detect URLs; Ctrl+click/tap opens them; paste URL over selection makes a link; "Paste as plain text" shortcut. | Small–medium |
+| B5 | **Markdown/PDF export and print** | Single-note and multi-note Markdown (headings, lists, checklists, images as files in a ZIP); print/PDF rendering for one note. | Medium–large |
+| B6 | **List/compact view and card density** | Optional dense list with titles/tags; saved with other view preferences. | Small–medium |
+| B7 | **Saved searches / smart filters** | Persist a combination of text, tags, color, view as a named filter chip. | Medium |
+| B8 | **Local revision history** | Bounded checkpoints (e.g., last 20 per note, time/size-throttled); restore as a copy, never overwrite. Needs referenced-image retention and backup inclusion decision. | Medium–large |
+| B9 | **Word/character count and reading stats** | Unobtrusive status in the editor overflow/find area. | Small |
+| B10 | **Trash retention option** | Optional "empty Trash after N days" (default off); never touches account tombstones needed for sync. | Small |
+
+## Round C — Desktop presence (Windows-native)
+
+| # | Feature | Notes | Effort |
+| --- | --- | --- | --- |
+| C1 | **System tray + Quit** | Opt-in "keep running in tray"; tray menu: New note, Show notes, Quit; Quit flushes all editors. | Medium (native) |
+| C2 | **Global quick-capture hotkey** | Configurable hotkey (default off) opens a new note under the cursor/at last position; conflict detection and clear failure message. | Medium (native) |
+| C3 | **Snap/edge and multi-monitor recovery** | Ensure restored note windows never land off-screen after monitor changes or DPI change; remember per-monitor bounds. *(verify current behavior first)* | Small–medium |
+| C4 | **Automatic local backups** | Optional rolling backup to a user-chosen folder (daily, keep last N), using the existing archive writer; visible last-backup status and failure notice. | Medium |
+| C5 | **Local reminders** | Due date/snooze/list. Feasibility check first: Windows toast scheduling with the app closed, sleep/resume, time-zone changes. Do not advertise delivery until verified. | Large |
+
+## Round D — Release and distribution
+
+| # | Item | Notes |
+| --- | --- | --- |
+| D1 | **Installer** | MSIX or Inno Setup installer with Start-menu shortcut, taskbar "New note" jump list that survives install, clean uninstall (also removing the auto-start entry). |
+| D2 | **Code signing and SmartScreen** | Needs a certificate decision (cost/owner); otherwise document the unsigned-warning behavior. |
+| D3 | **About / diagnostics** | About page (version, build, data location), "Copy diagnostics", local-only rotating log file for crash investigation; no telemetry. |
+| D4 | **Localization readiness** | `flutter_localizations` is already a dependency; extract strings to ARB files and use locale-aware dates, without translating yet. |
+| D5 | **Update path** | Manual "check for updates" against a user-supplied release URL or just documented replace-in-place steps; no silent self-update. |
+| D6 | **Android/iOS release prep** | Install Android SDK and build/test camera, share, import; iOS needs a Mac/Xcode and an iOS sign-in option. |
+
+## Track E — Cloud (blocked on owner configuration)
+
+- Provide Supabase project + Google OAuth credentials, then verify sign-in and **two-device** sync, conflict copies, and offline-then-online reconciliation.
+- Add cloud columns/migration for local-only metadata (`title`, `favorite`, `tags`, `archivedAt`, `deletedAt`) with a versioned SQL migration; legacy rows must not erase local metadata. Keep the RLS policy review and image storage limits in scope.
+- Decide whether images stay inline base64 or move to Supabase Storage with local file cache (also benefits local memory: file-backed assets instead of in-database base64 — migrate resumably, keep the old DB until validated).
+- Optional later: end-to-end encryption and backup encryption (design key recovery first; a UI lock alone is not encryption).
+
+## Suggested order
+
+1. **Round A** (A1, A2, A7 first; A3–A5 next; A6/A8 as environment allows).
+2. **Round B** starting with B1, B2, B4, B9 (cheap, visible), then B3, B5, B6; B7/B8/B10 by preference.
+3. **Round C/D** as a pair when a distributable build is wanted (C1, C4, D1, D3 give the most value).
+4. **Track E** when credentials exist.
+
+## Cross-cutting rules (per `AGENTS.md`)
+
+- Preserve current data compatibility: additive local schema changes with defaults, backup schema versioning (bump only when the format changes), no cloud-serialization changes without a matching migration.
+- Per batch: format changed Dart, run analysis once after edits settle, add tests for real regression risks (round trips, failure injection), Windows build once at the end of a batch, manual native checks for native/lifecycle work. Web checks only when shared behavior changes (A5 makes this possible).
+- Version bump and portable ZIP only for an actual release; record outcomes and limits in `STATUS.md`.
+
+## Decisions needed from you
+
+1. Which rounds/items to implement now (my recommendation: **Round A + B1, B2, B4, B9**).
+2. New dependencies allowed? (mobile file picker for A6, PDF/printing for B5, tray/hotkey plugin vs. native code for C1/C2, notifications for C5.)
+3. Is a distributable installer/signed build a goal (Round D), or does the portable ZIP suffice?
+4. Is Supabase/Google configuration coming soon (Track E)?
+5. Which platforms matter most next: Windows polish, web, or Android?
+
+---
+
+# Previous roadmap — offline usefulness, polish, and performance plan (completed)
 
 **Proposed on 2026-10-08. Implementation approved: proceed by phase and build Windows only after all implementation phases are finished.**
 

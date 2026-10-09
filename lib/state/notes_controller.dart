@@ -211,6 +211,8 @@ class NotesController extends NoteEditorStore {
   bool inlineImages = false;
   @override
   bool alwaysShowNoteHeader = false;
+  bool fastNoteOpening = true;
+  Future<void> Function()? applyFastNoteOpening;
   @override
   bool syncing = false;
   String? syncError;
@@ -251,6 +253,7 @@ class NotesController extends NoteEditorStore {
     inlineImages = await store.getSetting<bool>('inlineImages') ?? false;
     alwaysShowNoteHeader =
         await store.getSetting<bool>('alwaysShowNoteHeader') ?? false;
+    fastNoteOpening = await store.getSetting<bool>('fastNoteOpening') ?? true;
     final options = await store.getSetting<Map>('libraryOptions');
     if (options != null) {
       libraryView =
@@ -459,6 +462,13 @@ class NotesController extends NoteEditorStore {
     await store.setSetting('inlineImages', value);
     inlineImages = value;
     notifyListeners();
+  }
+
+  Future<void> setFastNoteOpening(bool value) async {
+    await store.setSetting('fastNoteOpening', value);
+    fastNoteOpening = value;
+    notifyListeners();
+    await applyFastNoteOpening?.call();
   }
 
   Future<void> setAlwaysShowNoteHeader(bool value) async {

@@ -334,6 +334,29 @@ class _SettingsPageState extends State<SettingsPage> {
                 }
               },
             ),
+            SwitchListTile(
+              key: const ValueKey('fast-note-opening'),
+              secondary: const Icon(Icons.bolt_outlined),
+              title: const Text('Fast note opening'),
+              subtitle: const Text(
+                'Keep one idle note window ready. Uses some memory; turn off '
+                'to open notes a little slower.',
+              ),
+              value: widget.controller.fastNoteOpening,
+              onChanged: (value) async {
+                try {
+                  await widget.controller.setFastNoteOpening(value);
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not save this preference: $error'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
@@ -423,7 +446,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? const Text(
                     'Review and add copies without replacing existing notes.',
                   )
-                : const Text('Import is available on desktop and web.'),
+                : const Text('Import is not available on this platform.'),
             enabled: !_workingFiles && backup_files.canImportBackup,
             onTap: _workingFiles || !backup_files.canImportBackup
                 ? null
