@@ -295,3 +295,16 @@ List<String> normalizeTags(Iterable<String> tags) =>
         .toSet()
         .toList()
       ..sort());
+
+/// Word/character counts and a reading-time estimate (200 words per minute).
+/// Embedded images (U+FFFC placeholders) are not counted.
+({int words, int characters, int minutes}) textStats(String text) {
+  final clean = text.replaceAll('￼', ' ');
+  final words = RegExp(r'\S+').allMatches(clean).length;
+  final characters = text.replaceAll('\n', '').replaceAll('￼', '').runes.length;
+  return (
+    words: words,
+    characters: characters,
+    minutes: words == 0 ? 0 : (words / 200).ceil(),
+  );
+}

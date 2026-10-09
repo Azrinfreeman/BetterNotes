@@ -54,6 +54,7 @@ dependencies:
   web: ^1.1.1
   file_selector_android: ^0.5.2+11
   file_selector_ios: ^0.5.3+6
+  pdf: ^3.13.1
 
 dev_dependencies:
   flutter_test:

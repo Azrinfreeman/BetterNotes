@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/note.dart';
+import '../data/revision.dart';
 import '../state/note_editor_store.dart';
 
 class RemoteNoteEditorStore extends NoteEditorStore {
@@ -28,6 +29,8 @@ class RemoteNoteEditorStore extends NoteEditorStore {
   bool inlineImages = false;
   @override
   bool alwaysShowNoteHeader = false;
+  @override
+  List<String> availableTags = const [];
 
   Future<void> load() async {
     if (_noteId == null) return;
@@ -74,6 +77,8 @@ class RemoteNoteEditorStore extends NoteEditorStore {
     customWindowButtons = state['customWindowButtons'] as bool? ?? false;
     inlineImages = state['inlineImages'] as bool? ?? false;
     alwaysShowNoteHeader = state['alwaysShowNoteHeader'] as bool? ?? false;
+    availableTags =
+        (state['availableTags'] as List?)?.cast<String>() ?? const [];
     themeMode = switch (state['theme']) {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
@@ -137,6 +142,36 @@ class RemoteNoteEditorStore extends NoteEditorStore {
   Future<void> restore(String id) => _applyResponse(
     _parent.invokeMethod<Map<dynamic, dynamic>>('restore_note', id),
   );
+
+  @override
+  Future<List<NoteRevision>> revisions(String noteId) async {
+    final raw = await _parent.invokeMethod<List<dynamic>>(
+      'note_revisions',
+      noteId,
+    );
+    return [
+      for (final value in raw ?? const [])
+        NoteRevision.fromJson(Map<dynamic, dynamic>.from(value as Map)),
+    ];
+  }
+
+  @override
+  Future<Note?> restoreRevision(String revisionId) async {
+    final raw = await _parent.invokeMethod<Map<dynamic, dynamic>>(
+      'restore_revision',
+      revisionId,
+    );
+    return raw == null ? null : Note.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<Note?> duplicate(String id) async {
+    final raw = await _parent.invokeMethod<Map<dynamic, dynamic>>(
+      'duplicate_note',
+      id,
+    );
+    return raw == null ? null : Note.fromJson(Map<String, dynamic>.from(raw));
+  }
 
   @override
   Future<void> archive(String id, {bool archived = true}) {

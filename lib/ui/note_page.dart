@@ -12,7 +12,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../data/clipboard_image.dart';
+import '../data/backup_files.dart' show saveBackupFile;
+import '../data/markdown_export.dart';
 import '../data/note.dart';
+import '../data/pdf_export.dart';
 import '../state/note_editor_store.dart';
 import 'drawing_page.dart';
 import 'find_bar.dart';
@@ -20,6 +23,7 @@ import 'note_desktop_header.dart';
 import 'note_details_dialog.dart';
 import 'note_image_embed.dart';
 import 'shortcuts_help.dart';
+import 'version_history.dart';
 import 'text_color_dialog.dart';
 import 'text_style_panel.dart';
 
@@ -108,7 +112,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         // ignore: experimental_member_use
         clipboardConfig: quill.QuillClipboardConfig(
           // ignore: experimental_member_use
-          onClipboardPaste: () => _pasteImage(silentWhenEmpty: true),
+          onClipboardPaste: _pasteClipboard,
         ),
       ),
     );
@@ -230,7 +234,11 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
 
   Future<void> _editDetails(Note note) async {
     try {
-      final details = await showNoteDetailsDialog(context, note);
+      final details = await showNoteDetailsDialog(
+        context,
+        note,
+        suggestions: widget.controller.availableTags,
+      );
       if (details == null) return;
       await _flush();
       final current = widget.controller.noteById(note.id);
@@ -257,6 +265,39 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       _openFind();
       return;
     }
+    if (value == 'history') {
+      await showVersionHistory(context, widget.controller, note);
+      return;
+    }
+    if (value == 'markdown' || value == 'pdf') {
+      try {
+        await _flush();
+        final current = widget.controller.noteById(note.id) ?? note;
+        final file = value == 'pdf'
+            ? await exportPdf(current, widget.controller.image)
+            : await exportMarkdown([current], widget.controller.image);
+        final saved = await saveBackupFile(
+          file.bytes,
+          file.name,
+          mimeType: file.mimeType,
+        );
+        if (saved && mounted) _message('Exported "${file.name}".');
+      } catch (error) {
+        if (mounted) _message('Could not export: $error');
+      }
+      return;
+    }
+    if (value == 'duplicate') {
+      try {
+        final copy = await widget.controller.duplicate(note.id);
+        if (copy != null && mounted) {
+          _message('Duplicated as "${copy.displayTitle}".');
+        }
+      } catch (error) {
+        if (mounted) _message('Could not duplicate note: $error');
+      }
+      return;
+    }
     try {
       await _flush();
       final current = widget.controller.noteById(note.id);
@@ -276,16 +317,34 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
   }
 
   List<PopupMenuEntry<String>> _organizationItems(Note note) => [
+    PopupMenuItem(
+      enabled: false,
+      height: 32,
+      child: Text(_statsLabel(), style: Theme.of(context).textTheme.bodySmall),
+    ),
+    const PopupMenuDivider(),
     const PopupMenuItem(value: 'details', child: Text('Title and tags')),
     PopupMenuItem(
       value: 'favorite',
       child: Text(note.favorite ? 'Remove favorite' : 'Favorite'),
     ),
+    const PopupMenuItem(value: 'duplicate', child: Text('Duplicate note')),
+    const PopupMenuItem(value: 'history', child: Text('Version history')),
+    const PopupMenuItem(value: 'markdown', child: Text('Export as Markdown')),
+    const PopupMenuItem(value: 'pdf', child: Text('Export as PDF (to print)')),
     const PopupMenuItem(value: 'archive', child: Text('Archive note')),
     const PopupMenuItem(value: 'find', child: Text('Find in note (Ctrl+H)')),
     const PopupMenuItem(value: 'help', child: Text('Keyboard shortcuts (F1)')),
     const PopupMenuDivider(),
   ];
+
+  String _statsLabel() {
+    final stats = textStats(_editor.document.toPlainText());
+    String plural(int n, String word) => '$n $word${n == 1 ? '' : 's'}';
+    return '${plural(stats.words, 'word')} · '
+        '${plural(stats.characters, 'character')}'
+        '${stats.minutes > 0 ? ' · ${stats.minutes} min read' : ''}';
+  }
 
   Future<void> _headerMenuAction(String value, Note note) async {
     try {
@@ -333,6 +392,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         _openFind();
         return true;
       case LogicalKeyboardKey.keyV:
+        if (HardwareKeyboard.instance.isShiftPressed && _editorFocus.hasFocus) {
+          unawaited(_pastePlainText());
+          return true;
+        }
         // The focused editor awaits image paste before falling back to text.
         if (!_editorFocus.hasFocus && !_findFocus.hasFocus) {
           unawaited(_pasteImage(silentWhenEmpty: true));
@@ -568,6 +631,39 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     } catch (error) {
       if (mounted) _message('Could not add image: $error');
     }
+  }
+
+  static final _urlPattern = RegExp(r'^https?://\S+$', caseSensitive: false);
+
+  /// Image first; then a URL pasted over a selection becomes a link on that
+  /// text. Returning false lets the editor perform its normal text paste.
+  Future<bool> _pasteClipboard() async {
+    if (await _pasteImage(silentWhenEmpty: true)) return true;
+    final selection = _editor.selection;
+    if (!selection.isValid || selection.isCollapsed) return false;
+    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim();
+    if (text == null || !_urlPattern.hasMatch(text)) return false;
+    _editor.formatText(
+      selection.start,
+      selection.end - selection.start,
+      quill.LinkAttribute(text),
+    );
+    return true;
+  }
+
+  /// Ctrl+Shift+V: inserts clipboard text without any formatting.
+  Future<void> _pastePlainText() async {
+    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    if (text == null || text.isEmpty || !mounted) return;
+    final selection = _editor.selection;
+    final start = selection.isValid ? selection.start : 0;
+    final end = selection.isValid ? selection.end : 0;
+    _editor.replaceText(
+      start,
+      end - start,
+      text,
+      TextSelection.collapsed(offset: start + text.length),
+    );
   }
 
   Future<bool> _pasteImage({bool silentWhenEmpty = false}) async {

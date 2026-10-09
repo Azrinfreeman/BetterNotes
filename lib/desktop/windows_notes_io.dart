@@ -181,6 +181,15 @@ class DesktopCoordinator with WindowListener {
       case 'restore_note':
         await controller.restore(args as String);
         return _state(args);
+      case 'note_revisions':
+        return [
+          for (final revision in await controller.revisions(args as String))
+            revision.toJson(light: true),
+        ];
+      case 'restore_revision':
+        return (await controller.restoreRevision(args as String))?.toJson();
+      case 'duplicate_note':
+        return (await controller.duplicate(args as String))?.toJson();
       case 'archive_note':
         await controller.archive(args as String);
         return _state(args);
@@ -250,6 +259,7 @@ class DesktopCoordinator with WindowListener {
       'customWindowButtons': controller.customWindowButtons,
       'inlineImages': controller.inlineImages,
       'alwaysShowNoteHeader': controller.alwaysShowNoteHeader,
+      'availableTags': controller.availableTags,
     };
   }
 

@@ -16,7 +16,7 @@ Future<void> showShortcutsHelp(BuildContext context) => showDialog<void>(
         SizedBox(height: 16),
         Text('In a note', style: TextStyle(fontWeight: FontWeight.bold)),
         Text(
-          'Ctrl+W — Save and close\nCtrl+D — Move to Trash\nCtrl+H — Find in this note\nEnter / Shift+Enter — Next / previous match\nEscape — Close find',
+          'Ctrl+W — Save and close\nCtrl+D — Move to Trash\nCtrl+H — Find in this note\nEnter / Shift+Enter — Next / previous match\nEscape — Close find\nCtrl+Shift+V — Paste as plain text\nPaste a web address over selected text — Make a link',
         ),
         SizedBox(height: 16),
         Text(

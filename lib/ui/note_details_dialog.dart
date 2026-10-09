@@ -6,8 +6,9 @@ import '../data/note.dart';
 /// cancelled.
 Future<({String title, String tags})?> showNoteDetailsDialog(
   BuildContext context,
-  Note note,
-) async {
+  Note note, {
+  List<String> suggestions = const [],
+}) async {
   final title = TextEditingController(text: note.title);
   final tags = TextEditingController(text: note.tags.join(', '));
   try {
@@ -36,6 +37,48 @@ Future<({String title, String tags})?> showNoteDetailsDialog(
                   hintText: 'work, ideas, personal',
                 ),
               ),
+              if (suggestions.isNotEmpty)
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: tags,
+                  builder: (context, value, _) {
+                    final entries = value.text.split(',');
+                    final typing = entries.last.trim().toLowerCase();
+                    final used = normalizeTags(
+                      entries.take(entries.length - 1),
+                    );
+                    final options = [
+                      for (final tag in suggestions)
+                        if (!used.contains(tag) && tag.contains(typing)) tag,
+                    ].take(12);
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final tag in options)
+                            ActionChip(
+                              label: Text(tag),
+                              onPressed: () {
+                                final text = [
+                                  ...entries
+                                      .take(entries.length - 1)
+                                      .map((e) => e.trim())
+                                      .where((e) => e.isNotEmpty),
+                                  tag,
+                                ].join(', ');
+                                tags.value = TextEditingValue(
+                                  text: '$text, ',
+                                  selection: TextSelection.collapsed(
+                                    offset: text.length + 2,
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
         ),

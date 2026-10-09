@@ -2,13 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/note.dart';
+import '../data/templates.dart';
 import '../desktop/window_chrome.dart';
 import '../state/notes_controller.dart';
 export 'note_cards.dart';
 import 'note_cards.dart';
 import 'note_page.dart';
 import 'settings_page.dart';
+import 'bulk_actions.dart';
 import 'shortcuts_help.dart';
+import 'tag_manager.dart';
 
 class NotesHome extends StatefulWidget {
   const NotesHome({
@@ -43,10 +47,96 @@ class _NotesHomeState extends State<NotesHome> {
 
   void _focusSearch() => _searchFocus.requestFocus();
 
+  Future<void> _applyFilter(SavedFilter filter) async {
+    _search.text = filter.query;
+    setState(_selected.clear);
+    await _options(view: filter.view, sort: filter.sort, tags: filter.tags);
+  }
+
+  Future<void> _saveFilter() async {
+    final field = TextEditingController();
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Save this search'),
+          content: TextField(
+            key: const ValueKey('filter-name'),
+            controller: field,
+            autofocus: true,
+            maxLength: 40,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              helperText: 'Keeps the search text, view, sort, and tags. Same name replaces.',
+            ),
+            onSubmitted: (value) => Navigator.pop(context, value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, field.text),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      if (name == null || name.trim().isEmpty) return;
+      await widget.controller.saveFilter(name, _search.text);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save search: $error')),
+        );
+      }
+    } finally {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      field.dispose();
+    }
+  }
+
+  Widget _savedFilters() {
+    final filters = widget.controller.savedFilters;
+    final custom =
+        _search.text.trim().isNotEmpty ||
+        widget.controller.selectedTags.isNotEmpty ||
+        widget.controller.libraryView != LibraryView.notes ||
+        widget.controller.noteSort != NoteSort.updated;
+    if (filters.isEmpty && !custom) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final filter in filters)
+            InputChip(
+              key: ValueKey('saved-filter-${filter.name}'),
+              label: Text(filter.name),
+              avatar: const Icon(Icons.bookmark_outline, size: 18),
+              onPressed: () => _applyFilter(filter),
+              deleteIcon: const Icon(Icons.close, size: 18),
+              deleteButtonTooltipMessage: 'Delete saved search ${filter.name}',
+              onDeleted: () => widget.controller.deleteFilter(filter.name),
+            ),
+          if (custom)
+            ActionChip(
+              avatar: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: const Text('Save search'),
+              onPressed: _saveFilter,
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _options({
     LibraryView? view,
     NoteSort? sort,
     List<String>? tags,
+    bool? compact,
     bool reset = false,
   }) async {
     try {
@@ -54,6 +144,7 @@ class _NotesHomeState extends State<NotesHome> {
         view: view,
         sort: sort,
         tags: tags,
+        compact: compact,
         reset: reset,
       );
       if (mounted) {
@@ -114,9 +205,23 @@ class _NotesHomeState extends State<NotesHome> {
                       ),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
                     children: [
+                      TextButton(
+                        onPressed: () async {
+                          await showTagManager(context, widget.controller);
+                          refresh(() {
+                            final now = widget.controller.availableTags;
+                            available
+                              ..clear()
+                              ..addAll(now);
+                            selected.retainAll(now);
+                          });
+                        },
+                        child: const Text('Manage tags'),
+                      ),
                       TextButton(
                         onPressed: () => refresh(selected.clear),
                         child: const Text('Clear tags'),
@@ -175,11 +280,217 @@ class _NotesHomeState extends State<NotesHome> {
     super.dispose();
   }
 
-  Future<void> _newNote() async {
+  final Set<String> _selected = {};
+  bool get _selecting => _selected.isNotEmpty;
+
+  void _toggle(String id) => setState(() {
+    if (!_selected.remove(id)) _selected.add(id);
+  });
+
+  void _tapNote(String id) {
+    if (_selecting || HardwareKeyboard.instance.isControlPressed) {
+      _toggle(id);
+    } else {
+      _openNote(id);
+    }
+  }
+
+  Future<void> _bulk(Future<int> Function() action, String done) async {
+    try {
+      final count = await action();
+      if (!mounted) return;
+      setState(_selected.clear);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$done: $count note(s).')));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update notes: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _bulkTrash() async {
+    final ids = _selected.toList();
+    if (widget.controller.confirmDelete) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Move ${ids.length} note(s) to Trash?'),
+          content: const Text('You can restore them from Trash later.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Move to Trash'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    await _bulk(() => widget.controller.bulkTrash(ids), 'Moved to Trash');
+  }
+
+  Future<void> _bulkMore(String choice) async {
+    final ids = _selected.toList();
+    switch (choice) {
+      case 'all':
+        setState(() {
+          _selected.addAll(
+            widget.controller
+                .librarySearch(_search.text)
+                .where((note) => !note.deleted && note.archivedAt == null)
+                .map((note) => note.id),
+          );
+        });
+      case 'unfavorite':
+        await _bulk(
+          () => widget.controller.bulkFavorite(ids, false),
+          'Removed favorite',
+        );
+      case 'color':
+        final color = await pickNoteColor(context);
+        if (color != null && mounted) {
+          await _bulk(
+            () => widget.controller.bulkColor(ids, color),
+            'Color changed',
+          );
+        }
+      case 'tags':
+        final tags = await askTagsToAdd(
+          context,
+          widget.controller.availableTags,
+        );
+        if (tags != null && mounted) {
+          await _bulk(
+            () => widget.controller.bulkAddTags(ids, tags),
+            'Tags added',
+          );
+        }
+      case 'export':
+        await _bulk(() async {
+          final message = await exportNotesMarkdown(widget.controller, [
+            for (final id in ids)
+              if (widget.controller.noteById(id) case final Note note) note,
+          ]);
+          return message == null ? 0 : ids.length;
+        }, 'Exported');
+    }
+  }
+
+  PreferredSizeWidget _selectionBar(BuildContext context) => AppBar(
+    leading: IconButton(
+      tooltip: 'Clear selection',
+      icon: const Icon(Icons.close),
+      onPressed: () => setState(_selected.clear),
+    ),
+    title: Text('${_selected.length} selected'),
+    actions: [
+      IconButton(
+        tooltip: 'Favorite selected',
+        icon: const Icon(Icons.star_outline),
+        onPressed: () => _bulk(
+          () => widget.controller.bulkFavorite(_selected.toList(), true),
+          'Favorited',
+        ),
+      ),
+      IconButton(
+        tooltip: 'Archive selected',
+        icon: const Icon(Icons.archive_outlined),
+        onPressed: () => _bulk(
+          () => widget.controller.bulkArchive(_selected.toList()),
+          'Archived',
+        ),
+      ),
+      IconButton(
+        tooltip: 'Move selected to Trash',
+        icon: const Icon(Icons.delete_outline),
+        onPressed: _bulkTrash,
+      ),
+      PopupMenuButton<String>(
+        tooltip: 'More selection actions',
+        onSelected: _bulkMore,
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'all', child: Text('Select all shown')),
+          PopupMenuItem(value: 'color', child: Text('Set color')),
+          PopupMenuItem(value: 'tags', child: Text('Add tags')),
+          PopupMenuItem(value: 'unfavorite', child: Text('Remove favorite')),
+          PopupMenuItem(value: 'export', child: Text('Export as Markdown')),
+        ],
+      ),
+      const WindowButtons(),
+      const SizedBox(width: 8),
+    ],
+  );
+
+  Widget _libraryItem(Note note, bool showTrash) {
+    if (showTrash) {
+      return TrashCard(note: note, controller: widget.controller);
+    }
+    if (note.archivedAt != null) {
+      return ArchiveCard(note: note, controller: widget.controller);
+    }
+    final selected = _selected.contains(note.id);
+    final primary = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onLongPress: () => _toggle(note.id),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: widget.controller.compactView
+                ? CompactNoteTile(
+                    key: ValueKey(note.id),
+                    note: note,
+                    selected: selected,
+                    onOpen: () => _tapNote(note.id),
+                  )
+                : NoteCard(
+                    key: ValueKey(note.id),
+                    note: note,
+                    controller: widget.controller,
+                    onOpen: () => _tapNote(note.id),
+                  ),
+          ),
+          if (selected)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: primary, width: 3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          if (selected)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IgnorePointer(
+                child: Icon(
+                  Icons.check_circle,
+                  color: primary,
+                  semanticLabel: 'Selected',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _newNote([NoteTemplate? template]) async {
     if (_creating) return;
     setState(() => _creating = true);
     try {
-      final note = await widget.controller.create();
+      final note = template == null
+          ? await widget.controller.create()
+          : await widget.controller.createFromTemplate(template);
       if (!mounted) return;
       // A route stays pending until it closes; allow New note inside its editor.
       if (widget.openNoteWindow == null) setState(() => _creating = false);
@@ -233,6 +544,9 @@ class _NotesHomeState extends State<NotesHome> {
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
     bindings: {
+      const SingleActivator(LogicalKeyboardKey.escape): () {
+        if (_selecting) setState(_selected.clear);
+      },
       const SingleActivator(LogicalKeyboardKey.f1): () =>
           showShortcutsHelp(context),
       const SingleActivator(LogicalKeyboardKey.keyN, control: true): _newNote,
@@ -242,47 +556,62 @@ class _NotesHomeState extends State<NotesHome> {
     child: Focus(
       autofocus: true,
       child: Scaffold(
-        appBar: AppBar(
-          title: const WindowTitle(
-            child: Text(
-              'BetterNotes',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          actions: [
-            AnimatedBuilder(
-              animation: widget.controller,
-              builder: (context, _) => IconButton(
-                tooltip: widget.controller.syncError == null
-                    ? widget.controller.signedIn
-                          ? 'Sync notes'
-                          : 'Local notes'
-                    : 'Sync needs attention',
-                icon: Icon(
-                  widget.controller.syncError != null
-                      ? Icons.cloud_off_outlined
-                      : widget.controller.syncing
-                      ? Icons.sync
-                      : widget.controller.signedIn
-                      ? Icons.cloud_done_outlined
-                      : Icons.cloud_outlined,
+        appBar: _selecting
+            ? _selectionBar(context)
+            : AppBar(
+                title: const WindowTitle(
+                  child: Text(
+                    'BetterNotes',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
-                onPressed: widget.controller.signedIn
-                    ? widget.controller.sync
-                    : () => _openSettings(),
+                actions: [
+                  AnimatedBuilder(
+                    animation: widget.controller,
+                    builder: (context, _) => IconButton(
+                      tooltip: widget.controller.syncError == null
+                          ? widget.controller.signedIn
+                                ? 'Sync notes'
+                                : 'Local notes'
+                          : 'Sync needs attention',
+                      icon: Icon(
+                        widget.controller.syncError != null
+                            ? Icons.cloud_off_outlined
+                            : widget.controller.syncing
+                            ? Icons.sync
+                            : widget.controller.signedIn
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_outlined,
+                      ),
+                      onPressed: widget.controller.signedIn
+                          ? widget.controller.sync
+                          : () => _openSettings(),
+                    ),
+                  ),
+                  PopupMenuButton<NoteTemplate>(
+                    tooltip: 'New note from template',
+                    icon: const Icon(Icons.note_add_outlined),
+                    enabled: !_creating,
+                    onSelected: _newNote,
+                    itemBuilder: (_) => [
+                      for (final template in noteTemplates)
+                        PopupMenuItem(
+                          value: template,
+                          child: Text(template.name),
+                        ),
+                    ],
+                  ),
+                  IconButton(
+                    tooltip: 'Settings',
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: _openSettings,
+                  ),
+                  const WindowButtons(),
+                  const SizedBox(width: 8),
+                ],
               ),
-            ),
-            IconButton(
-              tooltip: 'Settings',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: _openSettings,
-            ),
-            const WindowButtons(),
-            const SizedBox(width: 8),
-          ],
-        ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _creating ? null : _newNote,
           icon: _creating
@@ -393,9 +722,24 @@ class _NotesHomeState extends State<NotesHome> {
                                         },
                                         child: const Text('Reset filters'),
                                       ),
+                                      IconButton(
+                                        tooltip: widget.controller.compactView
+                                            ? 'Card view'
+                                            : 'Compact list view',
+                                        icon: Icon(
+                                          widget.controller.compactView
+                                              ? Icons.grid_view_outlined
+                                              : Icons.view_list_outlined,
+                                        ),
+                                        onPressed: () => _options(
+                                          compact:
+                                              !widget.controller.compactView,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
+                                _savedFilters(),
                                 if (widget
                                         .controller
                                         .availableTags
@@ -521,6 +865,31 @@ class _NotesHomeState extends State<NotesHome> {
                             ),
                           );
                         }
+                        if (widget.controller.compactView && !showTrash) {
+                          return SliverPadding(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: SizedBox(
+                                    height: notes[index].archivedAt != null
+                                        ? 270
+                                        : 72 *
+                                              MediaQuery.textScalerOf(context)
+                                                  .scale(1)
+                                                  .clamp(1, 3),
+                                    child: _libraryItem(
+                                      notes[index],
+                                      showTrash,
+                                    ),
+                                  ),
+                                ),
+                                childCount: notes.length,
+                              ),
+                            ),
+                          );
+                        }
                         return SliverLayoutBuilder(
                           builder: (context, constraints) {
                             final columns = constraints.crossAxisExtent > 760
@@ -546,23 +915,8 @@ class _NotesHomeState extends State<NotesHome> {
                                               140,
                                     ),
                                 delegate: SliverChildBuilderDelegate(
-                                  (context, index) => showTrash
-                                      ? TrashCard(
-                                          note: notes[index],
-                                          controller: widget.controller,
-                                        )
-                                      : notes[index].archivedAt != null
-                                      ? ArchiveCard(
-                                          note: notes[index],
-                                          controller: widget.controller,
-                                        )
-                                      : NoteCard(
-                                          key: ValueKey(notes[index].id),
-                                          note: notes[index],
-                                          controller: widget.controller,
-                                          onOpen: () =>
-                                              _openNote(notes[index].id),
-                                        ),
+                                  (context, index) =>
+                                      _libraryItem(notes[index], showTrash),
                                   childCount: notes.length,
                                 ),
                               ),

@@ -10,11 +10,56 @@ import '../data/cloud_sync.dart';
 import '../data/backup.dart';
 import '../data/local_store.dart';
 import '../data/note.dart';
+import '../data/revision.dart';
+import '../data/templates.dart';
 import 'note_editor_store.dart';
 
 enum LibraryView { notes, favorites, archive, trash, allActive }
 
 enum NoteSort { updated, created, title }
+
+/// A named combination of search text, view, sort, and tags.
+class SavedFilter {
+  const SavedFilter({
+    required this.name,
+    this.query = '',
+    this.view = LibraryView.notes,
+    this.sort = NoteSort.updated,
+    this.tags = const [],
+  });
+
+  final String name;
+  final String query;
+  final LibraryView view;
+  final NoteSort sort;
+  final List<String> tags;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'query': query,
+    'view': view.name,
+    'sort': sort.name,
+    'tags': tags,
+  };
+
+  factory SavedFilter.fromJson(Map<dynamic, dynamic> json) => SavedFilter(
+    name: json['name'] as String? ?? '',
+    query: json['query'] as String? ?? '',
+    view:
+        LibraryView.values
+            .where((view) => view.name == json['view'])
+            .firstOrNull ??
+        LibraryView.notes,
+    sort:
+        NoteSort.values
+            .where((sort) => sort.name == json['sort'])
+            .firstOrNull ??
+        NoteSort.updated,
+    tags: normalizeTags(
+      (json['tags'] as List? ?? const []).whereType<String>(),
+    ),
+  );
+}
 
 class NotesController extends NoteEditorStore {
   NotesController(this.store, this.client) {
@@ -44,7 +89,14 @@ class NotesController extends NoteEditorStore {
   LibraryView libraryView = LibraryView.notes;
   NoteSort noteSort = NoteSort.updated;
   List<String> selectedTags = [];
+  bool compactView = false;
+  List<SavedFilter> savedFilters = const [];
+  int trashRetentionDays = 0;
   Future<void>? _writes;
+  final Map<String, DateTime> _lastRevision = {};
+
+  /// Minimum time between automatic checkpoints of one note.
+  Duration revisionInterval = const Duration(minutes: 5);
   final Map<String, int> _generations = {};
 
   List<Note> get notes => _activeCache ??= _sorted(false);
@@ -53,6 +105,7 @@ class NotesController extends NoteEditorStore {
     _notes.where((note) => !note.deleted && note.archivedAt != null).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
   );
+  @override
   List<String> get availableTags =>
       _tagsCache ??= normalizeTags(_notes.expand((note) => note.tags));
 
@@ -113,16 +166,20 @@ class NotesController extends NoteEditorStore {
     LibraryView? view,
     NoteSort? sort,
     List<String>? tags,
+    bool? compact,
     bool reset = false,
   }) => _enqueue(() async {
     final nextView = reset ? LibraryView.notes : view ?? libraryView;
     final nextSort = reset ? NoteSort.updated : sort ?? noteSort;
     final nextTags = reset ? <String>[] : normalizeTags(tags ?? selectedTags);
+    final nextCompact = compact ?? compactView;
     await store.setSetting('libraryOptions', {
       'view': nextView.name,
       'sort': nextSort.name,
       'tags': nextTags,
+      'compact': nextCompact,
     });
+    compactView = nextCompact;
     libraryView = nextView;
     noteSort = nextSort;
     selectedTags = nextTags;
@@ -269,10 +326,19 @@ class NotesController extends NoteEditorStore {
       selectedTags = normalizeTags(
         (options['tags'] as List? ?? const []).whereType<String>(),
       );
+      compactView = options['compact'] as bool? ?? false;
     }
     _lastOwner = ownerId;
     if (signedIn) await store.moveGuestNotes(ownerId);
+    trashRetentionDays = await store.getSetting<int>('trashRetentionDays') ?? 0;
+    savedFilters = [
+      for (final value
+          in await store.getSetting<List>('savedFilters') ?? const [])
+        if (value is Map && (value['name'] as String?)?.isNotEmpty == true)
+          SavedFilter.fromJson(value),
+    ];
     await reload();
+    await purgeExpiredTrash();
     // Metadata is additive; legacy records remain intact and decode with defaults.
     if (schema < 2) await store.setSetting('localSchemaVersion', 2);
     if (signedIn) unawaited(sync());
@@ -290,6 +356,108 @@ class NotesController extends NoteEditorStore {
     _replace(note);
     return note;
   });
+
+  Future<Note> createFromTemplate(NoteTemplate template) => _enqueue(() async {
+    final note = Note.fresh(ownerId).copyWith(
+      title: template.title,
+      delta: template.delta,
+      plainText: template.plainText,
+    );
+    await store.putNote(note);
+    _replace(note);
+    return note;
+  });
+
+  /// Copies a note with a new ID, copying image bytes under new IDs so the two
+  /// notes never share assets.
+  @override
+  Future<Note?> duplicate(String id) async {
+    await flushEditor(id);
+    await flushDesktopEditor?.call(id);
+    return _enqueue(() async {
+      final source = noteById(id);
+      if (source == null || source.ownerId != ownerId) return null;
+      final ids = {...source.images, ...inlineImageIds(source.delta)};
+      final remap = <String, String>{};
+      for (final imageId in ids) {
+        final bytes = await store.getImage(imageId);
+        if (bytes == null) continue;
+        final copyId = const Uuid().v4();
+        await store.putImage(copyId, bytes);
+        remap[imageId] = copyId;
+      }
+      final now = DateTime.now().toUtc();
+      final base = Note.fresh(ownerId);
+      final copy = base.copyWith(
+        delta: remapInlineImages(source.delta, remap),
+        plainText: source.plainText,
+        colorIndex: source.colorIndex,
+        images: [for (final image in source.images) remap[image] ?? image],
+        strokes: source.strokes,
+        title: source.title.trim().isEmpty ? '' : '${source.title.trim()} copy',
+        tags: source.tags,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await store.putNote(copy);
+      _replace(copy);
+      return copy;
+    });
+  }
+
+  /// Notes (not in Trash) using each tag, for the tag manager.
+  Map<String, int> get tagCounts {
+    final counts = <String, int>{};
+    for (final note in _notes) {
+      if (note.deleted) continue;
+      for (final tag in note.tags) {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  /// Renames [from] to [to] on every note; if [to] already exists the tags
+  /// merge. An empty [to] deletes the tag.
+  Future<int> renameTag(String from, String to) async {
+    final source = normalizeTags([from]);
+    if (source.isEmpty) return 0;
+    final target = normalizeTags([to]);
+    await flushAllEditors();
+    final changed = await _enqueue(() async {
+      var changed = 0;
+      for (final note in List<Note>.of(_notes)) {
+        if (!note.tags.contains(source.single)) continue;
+        final tags = [
+          for (final tag in note.tags)
+            if (tag != source.single) tag,
+          ...target,
+        ];
+        final updated = note.copyWith(
+          tags: tags,
+          updatedAt: DateTime.now().toUtc(),
+          dirty: true,
+        );
+        await store.putNote(updated);
+        _generations[note.id] = (_generations[note.id] ?? 0) + 1;
+        _replace(updated);
+        changed++;
+      }
+      return changed;
+    });
+    if (selectedTags.contains(source.single)) {
+      await setLibraryOptions(
+        tags: [
+          for (final tag in selectedTags)
+            if (tag != source.single) tag,
+          ...target,
+        ],
+      );
+    }
+    return changed;
+  }
+
+  Future<int> deleteTag(String tag) => renameTag(tag, '');
 
   @override
   Future<void> save(Note note) {
@@ -326,10 +494,85 @@ class NotesController extends NoteEditorStore {
         updatedAt: DateTime.now().toUtc(),
         dirty: true,
       );
+      await _checkpoint(current, changed);
       await store.putNote(changed);
       _replace(changed);
     });
   }
+
+  /// Keeps [before] as a revision when the content changed and the last
+  /// checkpoint is old enough. History is best effort and never blocks a save.
+  Future<void> _checkpoint(Note before, Note after) async {
+    if (listEquals(before.delta, after.delta) && before.title == after.title) {
+      return;
+    }
+    if (before.plainText.trim().isEmpty && before.images.isEmpty) return;
+    try {
+      final now = DateTime.now().toUtc();
+      var last = _lastRevision[before.id];
+      if (last == null) {
+        final existing = await store.revisionsFor(before.id);
+        last = existing.isEmpty
+            ? DateTime.fromMillisecondsSinceEpoch(0)
+            : existing.first.createdAt;
+        _lastRevision[before.id] = last;
+      }
+      if (now.difference(last) < revisionInterval) return;
+      await store.addRevision(
+        NoteRevision.capture(before, const Uuid().v4(), now),
+      );
+      _lastRevision[before.id] = now;
+    } catch (_) {
+      // A failed checkpoint must not lose the user's edit.
+    }
+  }
+
+  @override
+  Future<List<NoteRevision>> revisions(String noteId) async {
+    final note = noteById(noteId);
+    if (note == null || note.ownerId != ownerId) return const [];
+    return store.revisionsFor(noteId);
+  }
+
+  /// Creates a new note from an earlier version. The current note and the
+  /// version itself are never changed; images are copied under new IDs.
+  @override
+  Future<Note?> restoreRevision(String revisionId) => _enqueue(() async {
+    final revision = await store.revisionById(revisionId);
+    if (revision == null) return null;
+    final source = noteById(revision.noteId);
+    if (source == null || source.ownerId != ownerId) return null;
+    final remap = <String, String>{};
+    for (final imageId in revision.imageIds) {
+      final bytes = await store.getImage(imageId);
+      if (bytes == null) continue;
+      final copyId = const Uuid().v4();
+      await store.putImage(copyId, bytes);
+      remap[imageId] = copyId;
+    }
+    final now = DateTime.now().toUtc();
+    final stamp = revision.createdAt
+        .toLocal()
+        .toIso8601String()
+        .substring(0, 16)
+        .replaceFirst('T', ' ');
+    final label = revision.title.trim().isEmpty
+        ? source.displayTitle
+        : revision.title.trim();
+    final copy = Note.fresh(ownerId).copyWith(
+      title: '$label (version $stamp)',
+      delta: remapInlineImages(revision.delta, remap),
+      plainText: revision.plainText,
+      colorIndex: revision.colorIndex,
+      images: [for (final image in revision.images) remap[image] ?? image],
+      tags: revision.tags,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await store.putNote(copy);
+    _replace(copy);
+    return copy;
+  });
 
   @override
   Future<void> delete(Note note) => _enqueue(() async {
@@ -462,6 +705,117 @@ class NotesController extends NoteEditorStore {
     await store.setSetting('inlineImages', value);
     inlineImages = value;
     notifyListeners();
+  }
+
+  /// Saves (or replaces, by case-insensitive name) the current search setup.
+  Future<void> saveFilter(String name, String query) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final filter = SavedFilter(
+      name: trimmed.length > 40 ? trimmed.substring(0, 40) : trimmed,
+      query: query.trim(),
+      view: libraryView,
+      sort: noteSort,
+      tags: selectedTags,
+    );
+    final next = [
+      for (final value in savedFilters)
+        if (value.name.toLowerCase() != filter.name.toLowerCase()) value,
+      filter,
+    ];
+    await _storeFilters(next);
+  }
+
+  Future<void> deleteFilter(String name) => _storeFilters([
+    for (final value in savedFilters)
+      if (value.name != name) value,
+  ]);
+
+  Future<void> _storeFilters(List<SavedFilter> next) async {
+    await store.setSetting('savedFilters', [
+      for (final value in next) value.toJson(),
+    ]);
+    savedFilters = List.unmodifiable(next);
+    notifyListeners();
+  }
+
+  Future<void> setTrashRetentionDays(int days) async {
+    await store.setSetting('trashRetentionDays', days);
+    trashRetentionDays = days;
+    notifyListeners();
+    await purgeExpiredTrash();
+  }
+
+  /// Permanently removes local-only Trash older than the retention setting.
+  /// Account notes keep their sync tombstones and are never touched.
+  Future<int> purgeExpiredTrash({DateTime? now}) => _enqueue(() async {
+    if (trashRetentionDays <= 0) return 0;
+    final cutoff = (now ?? DateTime.now()).toUtc().subtract(
+      Duration(days: trashRetentionDays),
+    );
+    final expired = [
+      for (final note in _notes)
+        if (note.deleted &&
+            note.ownerId == guestOwner &&
+            (note.deletedAt ?? note.updatedAt).isBefore(cutoff))
+          note.id,
+    ];
+    for (final id in expired) {
+      await store.deleteNote(id);
+    }
+    if (expired.isNotEmpty) {
+      _notes.removeWhere((note) => expired.contains(note.id));
+      _index();
+      notifyListeners();
+    }
+    return expired.length;
+  });
+
+  /// Bulk actions for the multi-select bar. Each returns the notes changed.
+  Future<int> bulkFavorite(Iterable<String> ids, bool favorite) =>
+      _bulkSave(ids, (note) => note.copyWith(favorite: favorite));
+
+  Future<int> bulkColor(Iterable<String> ids, int colorIndex) =>
+      _bulkSave(ids, (note) => note.copyWith(colorIndex: colorIndex));
+
+  Future<int> bulkAddTags(Iterable<String> ids, Iterable<String> tags) =>
+      _bulkSave(ids, (note) => note.copyWith(tags: [...note.tags, ...tags]));
+
+  Future<int> bulkArchive(Iterable<String> ids) async {
+    var changed = 0;
+    for (final id in ids.toList()) {
+      final note = noteById(id);
+      if (note == null || note.deleted || note.archivedAt != null) continue;
+      await archive(id);
+      changed++;
+    }
+    return changed;
+  }
+
+  Future<int> bulkTrash(Iterable<String> ids) async {
+    await flushAllEditors();
+    var changed = 0;
+    for (final id in ids.toList()) {
+      final note = noteById(id);
+      if (note == null || note.deleted) continue;
+      await delete(note);
+      changed++;
+    }
+    return changed;
+  }
+
+  Future<int> _bulkSave(
+    Iterable<String> ids,
+    Note Function(Note) change,
+  ) async {
+    var changed = 0;
+    for (final id in ids.toList()) {
+      final note = noteById(id);
+      if (note == null || note.deleted || note.archivedAt != null) continue;
+      await save(change(note));
+      changed++;
+    }
+    return changed;
   }
 
   Future<void> setFastNoteOpening(bool value) async {

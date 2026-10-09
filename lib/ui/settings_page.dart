@@ -274,6 +274,35 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Empty Trash automatically'),
+                const Text(
+                  'Permanently deletes local notes after this long in Trash. '
+                  'Signed-in account notes keep their sync records and are not removed.',
+                ),
+                DropdownButton<int>(
+                  key: const ValueKey('trash-retention'),
+                  isExpanded: true,
+                  value: widget.controller.trashRetentionDays,
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('Never')),
+                    DropdownMenuItem(value: 7, child: Text('After 7 days')),
+                    DropdownMenuItem(value: 30, child: Text('After 30 days')),
+                    DropdownMenuItem(value: 90, child: Text('After 90 days')),
+                  ],
+                  onChanged: (days) {
+                    if (days != null) {
+                      widget.controller.setTrashRetentionDays(days);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 const Text('Image placement'),
                 const Text(
                   'Applies to new images. Existing images stay in place.',
