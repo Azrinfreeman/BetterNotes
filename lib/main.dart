@@ -6,6 +6,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_info.dart';
+import 'l10n/l10n.dart';
+import 'data/app_log.dart';
 import 'data/local_store.dart';
 import 'desktop/windows_notes_stub.dart'
     if (dart.library.io) 'desktop/windows_notes_io.dart'
@@ -22,6 +25,21 @@ const _supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLog.init();
+  final previousFlutterError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    AppLog.write(
+      'ERROR',
+      'Flutter: ${details.exceptionAsString()}',
+      null,
+      details.stack,
+    );
+    previousFlutterError?.call(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.write('ERROR', 'Unhandled', error, stack);
+    return false;
+  };
   final windows = await desktop.createDesktopCoordinator();
   if (windows.isNoteWindow) {
     // Every note window is its own engine; keep decoded images from each one
@@ -48,6 +66,7 @@ Future<void> main(List<String> arguments) async {
     });
     return;
   }
+  AppLog.write('INFO', 'Started $appName $appVersionLabel');
   await _launchMain(windows, arguments);
 }
 
@@ -73,6 +92,7 @@ Future<void> _launchMain(
     controller = NotesController(store, cloud);
     await controller.load();
   } catch (error, stack) {
+    AppLog.write('ERROR', 'Startup failed', error, stack);
     try {
       await store?.database.close();
     } catch (_) {
@@ -139,11 +159,13 @@ class BetterNotesApp extends StatelessWidget {
         highContrast: true,
       ),
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         quill.FlutterQuillLocalizations.delegate,
       ],
+      supportedLocales: AppLocalizations.supportedLocales,
       home: NotesHome(
         controller: controller,
         openNoteWindow: openNoteWindow,
@@ -191,11 +213,13 @@ class NoteWindowApp extends StatelessWidget {
         highContrast: true,
       ),
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         quill.FlutterQuillLocalizations.delegate,
       ],
+      supportedLocales: AppLocalizations.supportedLocales,
       home: noteId == null
           ? const SizedBox.shrink()
           : NotePage(

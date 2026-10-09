@@ -42,6 +42,18 @@ On this machine, Flutter is installed at `C:\Users\azrin\develop\flutter` and ad
 
 Windows note windows now have a coloured header with **New note**, **Change color** (twelve colours), **Always on top**, **More actions**, and **Close note**. It fades when the pointer leaves; hover over the top edge or focus a header button with the keyboard to reveal it. Menus and the colour picker keep it visible. With BetterNotes window buttons, this is the note's only header; drag its empty space to move the window or double-click to maximize/restore. More actions includes minimize, share, and delete. Close saves and keeps the note; pinning applies until that window closes. These controls are included in the 1.0.2 portable archive.
 
+## Install, update, and uninstall (Windows)
+
+**Installer.** Run `BetterNotes-Setup-<version>.exe`. It installs for the current user (no administrator needed; the wizard can switch to all users), adds a Start-menu shortcut (optional desktop shortcut), and keeps the taskbar **New note** entry, which the app registers each time it starts. Build it with Inno Setup 6 after a Windows release build: `ISCC.exe /DAppVersion=<version> installer\BetterNotes.iss` (output in `dist`).
+
+**Updating.** Run the newer installer: it closes a running BetterNotes (which saves its notes), replaces the files in place, and offers to start it again. Settings, notes, and backups live outside the install folder and are untouched. For the portable ZIP: close BetterNotes (including its tray icon: Quit), extract the new ZIP over the old folder, and start `better_notes.exe`; if **Start with Windows** is on and you move the folder, turn it off and on again. There is no automatic update check or silent self-update.
+
+**Uninstalling.** Use Windows Settings -> Apps (or the Start-menu uninstaller). It removes the app files and shortcuts, the **Start with Windows** entry, the **BetterNotes Reminders** scheduled task, and the diagnostic logs. **Your notes database (`%APPDATA%\dev.betternotes`) is kept** so a reinstall finds your notes; delete that folder yourself, after exporting a backup, to remove them.
+
+**Unsigned warning.** Installers and executables here are not code-signed (no certificate has been purchased), so Windows SmartScreen may show "Windows protected your PC" on first run. Choose **More info -> Run anyway** only for a file you built or downloaded from a source you trust; a signing certificate would remove the warning.
+
+**About and diagnostics.** **Settings -> About BetterNotes** shows the version, where the notes data and log file are, and **Copy diagnostics** (versions, counts, and settings states plus the recent error log; never note text). The log stays on the device.
+
 ## Offline recovery and backups (current source)
 
 Delete moves notes to **Trash**, with Undo and Restore. Permanent deletion always asks for confirmation and is available for local notes; account Trash keeps the sync records needed to prevent deleted notes from reappearing. Cached images are retained conservatively for undo and recovery.
