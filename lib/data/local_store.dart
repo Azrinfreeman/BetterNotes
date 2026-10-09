@@ -7,6 +7,7 @@ import 'local_factory_web.dart'
     if (dart.library.io) 'local_factory_io.dart'
     as local_factory;
 import 'note.dart';
+import 'revision.dart';
 
 class LocalStore {
   LocalStore._(this.database);
@@ -16,6 +17,7 @@ class LocalStore {
   final _notes = stringMapStoreFactory.store('notes');
   final _assets = stringMapStoreFactory.store('assets');
   final _settings = stringMapStoreFactory.store('settings');
+  final _revisions = stringMapStoreFactory.store('revisions');
 
   static bool get canQuarantine => local_factory.canQuarantineLocalDatabase;
 
@@ -48,6 +50,54 @@ class LocalStore {
 
   Future<void> deleteNote(String id) async {
     await _notes.record(id).delete(database);
+    await deleteRevisions(id);
+  }
+
+  /// Newest first.
+  Future<List<NoteRevision>> revisionsFor(String noteId) async {
+    final records = await _revisions.find(
+      database,
+      finder: Finder(
+        filter: Filter.equals('note_id', noteId),
+        sortOrders: [SortOrder('created_at', false)],
+      ),
+    );
+    return [for (final record in records) NoteRevision.fromJson(record.value)];
+  }
+
+  Future<NoteRevision?> revisionById(String id) async {
+    final value = await _revisions.record(id).get(database);
+    return value == null ? null : NoteRevision.fromJson(value);
+  }
+
+  /// Stores a revision and trims the note's history to [maxRevisionsPerNote].
+  Future<void> addRevision(NoteRevision revision) =>
+      database.transaction((txn) async {
+        await _revisions.record(revision.id).put(txn, revision.toJson());
+        final records = await _revisions.find(
+          txn,
+          finder: Finder(
+            filter: Filter.equals('note_id', revision.noteId),
+            sortOrders: [SortOrder('created_at', false)],
+          ),
+        );
+        for (final stale in records.skip(maxRevisionsPerNote)) {
+          await _revisions.record(stale.key).delete(txn);
+        }
+      });
+
+  Future<void> deleteRevisions(String noteId) => _revisions.delete(
+    database,
+    finder: Finder(filter: Filter.equals('note_id', noteId)),
+  );
+
+  Future<List<NoteRevision>> allRevisions(Set<String> noteIds) async {
+    final records = await _revisions.find(database);
+    return [
+      for (final record in records)
+        if (noteIds.contains(record.value['note_id']))
+          NoteRevision.fromJson(record.value),
+    ];
   }
 
   /// Compare and acknowledge in one transaction so an in-flight sync cannot
@@ -83,6 +133,12 @@ class LocalStore {
     final notes = await notesFor(ownerId);
     for (final note in notes) {
       await _notes.record(note.id).delete(database);
+      for (final revision in await revisionsFor(note.id)) {
+        for (final imageId in revision.imageIds) {
+          await _assets.record(imageId).delete(database);
+        }
+      }
+      await deleteRevisions(note.id);
       for (final imageId in note.images) {
         await _assets.record(imageId).delete(database);
       }
@@ -105,8 +161,9 @@ class LocalStore {
   Future<void> importCollection(
     List<Note> notes,
     Map<String, Uint8List> assets,
-    Map<String, Object> preferences,
-  ) async {
+    Map<String, Object> preferences, {
+    List<NoteRevision> revisions = const [],
+  }) async {
     await database.transaction((txn) async {
       for (final entry in assets.entries) {
         if (await _assets.record(entry.key).exists(txn)) {
@@ -121,6 +178,12 @@ class LocalStore {
           throw StateError('An imported note ID already exists.');
         }
         await _notes.record(note.id).put(txn, note.toJson());
+      }
+      for (final revision in revisions) {
+        if (await _revisions.record(revision.id).exists(txn)) {
+          throw StateError('An imported revision ID already exists.');
+        }
+        await _revisions.record(revision.id).put(txn, revision.toJson());
       }
       for (final entry in preferences.entries) {
         await _settings.record(entry.key).put(txn, {'value': entry.value});

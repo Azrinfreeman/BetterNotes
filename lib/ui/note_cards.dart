@@ -217,6 +217,85 @@ class ArchiveCard extends StatelessWidget {
   );
 }
 
+/// One dense row for the compact list view: color strip, title, a snippet
+/// with tags, and a star for favorites.
+class CompactNoteTile extends StatelessWidget {
+  const CompactNoteTile({
+    super.key,
+    required this.note,
+    required this.onOpen,
+    this.selected = false,
+  });
+  final Note note;
+  final VoidCallback onOpen;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(noteColors[note.colorIndex % noteColors.length]);
+    final scheme = Theme.of(context).colorScheme;
+    final snippet = note.title.trim().isEmpty
+        ? note.plainText.trimLeft().split('\n').skip(1).join(' ').trim()
+        : note.plainText.replaceAll('\n', ' ').trim();
+    final detail = [
+      noteTime(note.updatedAt),
+      if (note.tasks.total > 0) '${note.tasks.done}/${note.tasks.total} tasks',
+      if (note.tags.isNotEmpty) note.tags.join(', '),
+      if (snippet.isNotEmpty) snippet,
+    ].join(' · ');
+    return Semantics(
+      container: true,
+      label:
+          '${note.displayTitle}. Updated ${noteTime(note.updatedAt)}. '
+          '${noteColorNames[note.colorIndex % noteColorNames.length]} note.',
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        color: selected ? scheme.primaryContainer : null,
+        child: InkWell(
+          onTap: onOpen,
+          child: Row(
+            children: [
+              Container(width: 8, color: color),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        note.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (note.favorite)
+                const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.star, size: 20, semanticLabel: 'Favorite'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class NoteCard extends StatelessWidget {
   const NoteCard({
     super.key,
@@ -270,12 +349,14 @@ class NoteCard extends StatelessWidget {
                       tooltip: 'Note options',
                       icon: const Icon(Icons.more_horiz),
                       onSelected: (value) async {
-                        if (value == -2 || value == -3) {
+                        if (value == -2 || value == -3 || value == -4) {
                           try {
                             if (value == -2) {
                               await controller.save(
                                 note.copyWith(favorite: !note.favorite),
                               );
+                            } else if (value == -4) {
+                              await controller.duplicate(note.id);
                             } else {
                               await controller.archive(note.id);
                             }
@@ -342,6 +423,10 @@ class NoteCard extends StatelessWidget {
                           child: Text(
                             note.favorite ? 'Remove favorite' : 'Favorite',
                           ),
+                        ),
+                        const PopupMenuItem<int>(
+                          value: -4,
+                          child: Text('Duplicate note'),
                         ),
                         const PopupMenuItem<int>(
                           value: -3,

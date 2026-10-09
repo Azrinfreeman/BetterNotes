@@ -116,6 +116,10 @@ void main() {
     await tester.tap(find.text('Trash'));
     await tester.pumpAndSettle();
     expect(find.text('Recover this thought'), findsOneWidget);
+    // The Undo snackbar covers the lower edge of this 600 px test screen.
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first))
+        .clearSnackBars();
+    await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await tester.tap(find.text('Restore'));
       await controller.waitForWrites();
