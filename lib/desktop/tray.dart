@@ -27,6 +27,11 @@ const quickCapturePresets = <String, QuickCapturePreset>{
 class DesktopIntegration {
   static const _channel = MethodChannel('betternotes/windows');
 
+  /// Shows a tray balloon (a Windows notification). Returns false when
+  /// Windows refused it.
+  static Future<bool> showBalloon(String title, String text) async =>
+      await _channel.invokeMethod<bool>('showBalloon', [title, text]) ?? false;
+
   static Future<void> setTray(bool visible) =>
       _channel.invokeMethod<void>('setTray', visible);
 

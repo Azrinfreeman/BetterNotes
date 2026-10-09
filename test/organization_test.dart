@@ -502,6 +502,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.archiveNotes.single.plainText, 'Final draft');
       expect(find.byType(quill.QuillEditor), findsNothing);
+      await tester.ensureVisible(find.text('Archive'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Archive'));
       await tester.pumpAndSettle();
       expect(find.text('Project plan'), findsOneWidget);

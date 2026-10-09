@@ -51,6 +51,10 @@ class BackupData {
           delta: remapInlineImages(note.delta, assetIds),
           revision: 0,
           dirty: true,
+          // Imports are copies: keep only reminders still waiting in the
+          // future, so restoring never fires old or duplicate alerts.
+          clearReminder:
+              !(note.reminderPending && note.remindAt!.isAfter(DateTime.now())),
         ),
     ];
     final perNote = <String, int>{};
@@ -325,7 +329,11 @@ class NoteBackup {
                   (json['tags'] as List).any((tag) => tag is! String))) ||
           (json['archived_at'] != null &&
               (json['archived_at'] is! String ||
-                  DateTime.tryParse(json['archived_at'] as String) == null))) {
+                  DateTime.tryParse(json['archived_at'] as String) == null)) ||
+          (json['remind_at'] != null &&
+              (json['remind_at'] is! String ||
+                  DateTime.tryParse(json['remind_at'] as String) == null)) ||
+          (json['reminder_fired'] != null && json['reminder_fired'] is! bool)) {
         throw const FormatException('Invalid organization metadata.');
       }
       final id = json['id'] as String;

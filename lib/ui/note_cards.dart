@@ -240,6 +240,7 @@ class CompactNoteTile extends StatelessWidget {
     final detail = [
       noteTime(note.updatedAt),
       if (note.tasks.total > 0) '${note.tasks.done}/${note.tasks.total} tasks',
+      ?reminderLabel(note),
       if (note.tags.isNotEmpty) note.tags.join(', '),
       if (snippet.isNotEmpty) snippet,
     ].join(' · ');
@@ -481,13 +482,16 @@ class NoteCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (note.tasks.total > 0 || note.tags.isNotEmpty)
+              if (note.tasks.total > 0 ||
+                  note.tags.isNotEmpty ||
+                  note.remindAt != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: Text(
                     [
                       if (note.tasks.total > 0)
                         '${note.tasks.done}/${note.tasks.total} tasks',
+                      ?reminderLabel(note),
                       if (note.tags.isNotEmpty) note.tags.join(', '),
                     ].join(' · '),
                     maxLines: 1,
@@ -531,6 +535,31 @@ class NoteCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Date and time for reminders: "Today 9:00 AM", "Tomorrow 9:00 AM", "12 Oct 9:00 AM".
+String reminderTime(DateTime date) {
+  final local = date.toLocal();
+  final now = DateTime.now();
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final clock =
+      '$hour:${local.minute.toString().padLeft(2, '0')} ${local.hour < 12 ? 'AM' : 'PM'}';
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(local.year, local.month, local.day);
+  final diff = day.difference(today).inDays;
+  if (diff == 0) return 'Today $clock';
+  if (diff == 1) return 'Tomorrow $clock';
+  final year = local.year == now.year ? '' : ' ${local.year}';
+  return '${local.day} ${_months[local.month - 1]}$year $clock';
+}
+
+/// Short reminder text for cards, or null when the note has none.
+String? reminderLabel(Note note) {
+  final at = note.remindAt;
+  if (at == null) return null;
+  return note.reminderFired
+      ? 'Reminder shown ${reminderTime(at)}'
+      : 'Reminder ${reminderTime(at)}';
 }
 
 String noteTime(DateTime date) {

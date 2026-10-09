@@ -14,6 +14,7 @@
 
 namespace {
 constexpr UINT kTrayIconId = 1;
+constexpr UINT_PTR kBalloonTimerId = 7;
 constexpr int kQuickCaptureHotkeyId = 0x4E4E;
 enum TrayCommand : UINT {
   kTrayNewNote = 1,
@@ -90,6 +91,29 @@ bool FlutterWindow::OnCreate() {
           result->Success();
           return;
         }
+        if (call.method_name() == "showBalloon") {
+          const auto *values =
+              std::get_if<flutter::EncodableList>(call.arguments());
+          if (values == nullptr || values->size() != 2) {
+            result->Error("invalid_argument", "Expected [title, text].");
+            return;
+          }
+          const auto widen = [](const std::string &text) {
+            const int length = MultiByteToWideChar(
+                CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
+                nullptr, 0);
+            std::wstring wide(length, L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, text.c_str(),
+                                static_cast<int>(text.size()), wide.data(),
+                                length);
+            return wide;
+          };
+          const bool shown =
+              ShowBalloon(widen(std::get<std::string>((*values)[0])),
+                          widen(std::get<std::string>((*values)[1])));
+          result->Success(flutter::EncodableValue(shown));
+          return;
+        }
         if (call.method_name() == "setQuickCapture") {
           const auto *values = std::get_if<flutter::EncodableList>(call.arguments());
           if (values == nullptr || values->size() != 3) {
@@ -150,6 +174,7 @@ void FlutterWindow::ShowMainWindow() {
 
 bool FlutterWindow::SetTrayVisible(bool visible) {
   HWND hwnd = GetHandle();
+  tray_temporary_ = false;
   NOTIFYICONDATAW data = {};
   data.cbSize = sizeof(data);
   data.hWnd = hwnd;
@@ -166,6 +191,37 @@ bool FlutterWindow::SetTrayVisible(bool visible) {
   if (tray_visible_) Shell_NotifyIconW(NIM_DELETE, &data);
   tray_visible_ = Shell_NotifyIconW(NIM_ADD, &data) == TRUE;
   return tray_visible_;
+}
+
+void FlutterWindow::RemoveTemporaryTray() {
+  KillTimer(GetHandle(), kBalloonTimerId);
+  if (tray_temporary_) SetTrayVisible(false);
+}
+
+// Shows a balloon/toast from the tray icon. Without the user's tray icon a
+// temporary one is added and removed again after the balloon is gone.
+bool FlutterWindow::ShowBalloon(const std::wstring& title,
+                                const std::wstring& text) {
+  HWND hwnd = GetHandle();
+  bool added_here = false;
+  if (!tray_visible_) {
+    if (!SetTrayVisible(true)) return false;
+    added_here = true;
+  }
+  NOTIFYICONDATAW data = {};
+  data.cbSize = sizeof(data);
+  data.hWnd = hwnd;
+  data.uID = kTrayIconId;
+  data.uFlags = NIF_INFO;
+  data.dwInfoFlags = NIIF_INFO;
+  wcsncpy_s(data.szInfoTitle, title.c_str(), _TRUNCATE);
+  wcsncpy_s(data.szInfo, text.c_str(), _TRUNCATE);
+  const bool ok = Shell_NotifyIconW(NIM_MODIFY, &data) == TRUE;
+  if (added_here) {
+    tray_temporary_ = true;
+    SetTimer(hwnd, kBalloonTimerId, 20000, nullptr);
+  }
+  return ok;
 }
 
 void FlutterWindow::ShowTrayMenu() {
@@ -229,6 +285,18 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == kBetterNotesActivateMessage && wparam == 2) {
+    // A scheduled-task launch while we are already running: just re-check
+    // reminders, without bringing any window forward.
+    if (commands_ready_ && command_channel_) {
+      command_channel_->InvokeMethod("checkReminders", nullptr);
+    }
+    return 0;
+  }
+  if (message == WM_TIMER && wparam == kBalloonTimerId) {
+    RemoveTemporaryTray();
+    return 0;
+  }
   if (message == kBetterNotesActivateMessage) {
     ShowWindow(hwnd, SW_RESTORE);
     SetForegroundWindow(hwnd);
@@ -250,6 +318,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       case WM_RBUTTONUP:
       case WM_CONTEXTMENU:
         ShowTrayMenu();
+        break;
+      case NIN_BALLOONUSERCLICK:
+        if (commands_ready_ && command_channel_) {
+          command_channel_->InvokeMethod("balloonClicked", nullptr);
+        }
+        RemoveTemporaryTray();
+        break;
+      case NIN_BALLOONTIMEOUT:
+        RemoveTemporaryTray();
         break;
     }
     return 0;

@@ -9,6 +9,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../data/reminder_task.dart';
 import 'tray.dart';
 import 'window_fit.dart';
 import '../data/note.dart';
@@ -64,6 +65,10 @@ class DesktopCoordinator with WindowListener {
   final Map<String, Completer<void>> _readyWaiters = {};
   WindowController? _idleWindow;
   Timer? _refillTimer;
+  Timer? _reminderTimer;
+  Future<void> _taskTail = Future<void>.value();
+  bool _checkingReminders = false;
+  String? _balloonNoteId;
 
   bool get isNoteWindow => _parentId != null;
   bool get supportsNoteWindows => _window != null && !isNoteWindow;
@@ -78,6 +83,7 @@ class DesktopCoordinator with WindowListener {
     controller.flushDesktopEditors = flushChildren;
     controller.flushDesktopEditor = flushChild;
     controller.applyFastNoteOpening = _applyFastOpening;
+    controller.remindersChanged = _syncReminderTask;
     controller.applyTray = () =>
         DesktopIntegration.setTray(controller.keepInTray);
     controller.applyQuickCapture = () =>
@@ -96,6 +102,15 @@ class DesktopCoordinator with WindowListener {
         await createAndOpenNote();
       } else if (call.method == 'quit') {
         await _closeMain();
+      } else if (call.method == 'checkReminders') {
+        await _checkReminders();
+      } else if (call.method == 'balloonClicked') {
+        final id = _balloonNoteId;
+        if (id != null) {
+          await openNote(id);
+        } else {
+          await _showMainWindow();
+        }
       }
     });
     controller.addListener(_broadcast);
@@ -116,6 +131,15 @@ class DesktopCoordinator with WindowListener {
           'The quick note shortcut $label could not be registered; another app may be using it. Choose a different one in Settings.';
       controller.quickCaptureKey = 'off';
     }
+    // Reminders: a periodic check also catches ones that came due while the
+    // PC slept (the timer fires again on wake) or the app was closed.
+    _reminderTimer?.cancel();
+    _reminderTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_checkReminders()),
+    );
+    Timer(const Duration(seconds: 3), () => unawaited(_checkReminders()));
+    unawaited(_syncReminderTask().catchError((_) {}));
     await _restoreWindows();
     // Pay for one native engine before the library becomes interactive. Reuse
     // this bounded spare for the next open and park an editor when it closes.
@@ -207,6 +231,13 @@ class DesktopCoordinator with WindowListener {
       case 'restore_note':
         await controller.restore(args as String);
         return _state(args);
+      case 'set_reminder':
+        final values = Map<dynamic, dynamic>.from(args as Map);
+        await controller.setReminder(
+          values['noteId'] as String,
+          DateTime.tryParse(values['at'] as String? ?? ''),
+        );
+        return _state(values['noteId'] as String);
       case 'note_revisions':
         return [
           for (final revision in await controller.revisions(args as String))
@@ -663,11 +694,84 @@ class DesktopCoordinator with WindowListener {
     }
   }
 
+  Future<void> _showMainWindow() async {
+    await windowManager.show();
+    await windowManager.focus();
+  }
+
+  Future<void> quitIfNoRemindersDue(NotesController controller) async {
+    if (controller.dueReminders().isNotEmpty) return;
+    await controller.store.database.close();
+    exit(0);
+  }
+
+  Future<void> _checkReminders() async {
+    final controller = _mainController;
+    if (controller == null || _shuttingDown || _checkingReminders) return;
+    _checkingReminders = true;
+    try {
+      final due = controller.dueReminders();
+      if (due.isEmpty) return;
+      for (final note in due) {
+        await controller.markReminderFired(note.id);
+      }
+      if (due.length == 1) {
+        final note = due.single;
+        final late =
+            DateTime.now().difference(note.remindAt!.toLocal()) >
+            const Duration(minutes: 2);
+        _balloonNoteId = note.id;
+        await DesktopIntegration.showBalloon(
+          late ? 'Missed reminder' : 'Reminder',
+          note.displayTitle,
+        );
+        await openNote(note.id);
+      } else {
+        _balloonNoteId = null;
+        await DesktopIntegration.showBalloon(
+          '${due.length} reminders',
+          due.map((note) => note.displayTitle).take(3).join(', '),
+        );
+        await controller.setLibraryOptions(view: LibraryView.reminders);
+        await _showMainWindow();
+      }
+    } catch (_) {
+      // The next check retries anything not yet marked as shown.
+    } finally {
+      _checkingReminders = false;
+    }
+  }
+
+  /// Keeps the Windows scheduled task in step with the reminders: it exists
+  /// only while the setting is on and a reminder is waiting. Calls are queued
+  /// so two changes never run PowerShell at the same time.
+  Future<void> _syncReminderTask() {
+    final controller = _mainController;
+    if (controller == null) return Future<void>.value();
+    final run = _taskTail.catchError((_) {}).then((_) async {
+      final next = controller.nextReminder;
+      if (!controller.reminderTaskEnabled || next == null) {
+        await removeReminderTask();
+      } else {
+        await syncReminderTask(next);
+      }
+      if (controller.reminderTaskError != null) {
+        controller.reminderTaskError = null;
+      }
+    });
+    _taskTail = run;
+    return run.catchError((Object error) {
+      controller.reminderTaskError = 'Reminder task: $error';
+      throw error;
+    });
+  }
+
   Future<void> _closeMain() async {
     if (_closing) return;
     _closing = true;
     _shuttingDown = true;
     _refillTimer?.cancel();
+    _reminderTimer?.cancel();
     try {
       await _openTail;
       // First save every editor. If one fails, keep all windows available.

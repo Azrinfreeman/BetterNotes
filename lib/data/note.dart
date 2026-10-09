@@ -97,6 +97,8 @@ class Note {
     this.favorite = false,
     this.tags = const [],
     this.archivedAt,
+    this.remindAt,
+    this.reminderFired = false,
   });
 
   final String id;
@@ -116,6 +118,21 @@ class Note {
   final bool favorite;
   final List<String> tags;
   final DateTime? archivedAt;
+
+  /// When to remind the user about this note. Local only (never synced).
+  final DateTime? remindAt;
+
+  /// True once the reminder has been shown; the note then offers Snooze/Done.
+  final bool reminderFired;
+
+  bool get reminderPending => remindAt != null && !reminderFired;
+
+  /// A reminder that is due and has not been shown yet.
+  bool reminderDue(DateTime now) =>
+      reminderPending &&
+      !deleted &&
+      archivedAt == null &&
+      !remindAt!.isAfter(now);
 
   String get displayTitle {
     if (title.trim().isNotEmpty) return title.trim();
@@ -207,6 +224,9 @@ class Note {
     List<String>? tags,
     DateTime? archivedAt,
     bool clearArchive = false,
+    DateTime? remindAt,
+    bool? reminderFired,
+    bool clearReminder = false,
   }) => Note(
     id: id ?? this.id,
     ownerId: ownerId ?? this.ownerId,
@@ -225,6 +245,10 @@ class Note {
     favorite: favorite ?? this.favorite,
     tags: tags == null ? this.tags : normalizeTags(tags),
     archivedAt: clearArchive ? null : archivedAt ?? this.archivedAt,
+    remindAt: clearReminder ? null : remindAt ?? this.remindAt,
+    reminderFired: clearReminder
+        ? false
+        : reminderFired ?? (remindAt != null ? false : this.reminderFired),
   );
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
@@ -255,6 +279,8 @@ class Note {
       (json['tags'] as List<dynamic>? ?? const []).cast<String>(),
     ),
     archivedAt: DateTime.tryParse(json['archived_at'] as String? ?? ''),
+    remindAt: DateTime.tryParse(json['remind_at'] as String? ?? ''),
+    reminderFired: json['reminder_fired'] as bool? ?? false,
   );
 
   Map<String, dynamic> toJson() => {
@@ -275,13 +301,22 @@ class Note {
     'favorite': favorite,
     'tags': tags,
     'archived_at': archivedAt?.toUtc().toIso8601String(),
+    'remind_at': remindAt?.toUtc().toIso8601String(),
+    'reminder_fired': reminderFired,
   };
 
   Map<String, dynamic> toRemoteJson() {
     final json = toJson();
     json.remove('dirty');
     json.remove('deleted_at'); // Local metadata; the cloud schema is unchanged.
-    for (final key in ['title', 'favorite', 'tags', 'archived_at']) {
+    for (final key in [
+      'title',
+      'favorite',
+      'tags',
+      'archived_at',
+      'remind_at',
+      'reminder_fired',
+    ]) {
       json.remove(key);
     }
     return json;

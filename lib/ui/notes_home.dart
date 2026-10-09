@@ -649,6 +649,7 @@ class _NotesHomeState extends State<NotesHome> {
                                       for (final entry in const {
                                         LibraryView.notes: 'Notes',
                                         LibraryView.favorites: 'Favorites',
+                                        LibraryView.reminders: 'Reminders',
                                         LibraryView.archive: 'Archive',
                                         LibraryView.trash: 'Trash',
                                         LibraryView.allActive: 'All active',
