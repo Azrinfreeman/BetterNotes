@@ -787,5 +787,141 @@
   "bulkDoneTagsAdded": "Tags added",
   "bulkDoneExported": "Exported",
   "bulkDoneFavorited": "Favorited",
-  "bulkDoneArchived": "Archived"
+  "bulkDoneArchived": "Archived",
+  "imageQualityTitle": "Picture storage",
+  "imageQualityHelp": "Pictures are compressed once, when you add them, to save space on this device, in backups, and online. The original is not kept.",
+  "imageQualityBalanced": "Balanced (recommended)",
+  "imageQualitySmallest": "Smallest files",
+  "imageQualityOriginal": "Original (only shrink huge pictures)",
+  "shrinkTitle": "Shrink saved pictures",
+  "shrinkSubtitle": "Re-compress the pictures already in your notes with the setting above. They are replaced by smaller copies and this cannot be undone.",
+  "shrinkSignedIn": "Not available while signed in: pictures that were already uploaded would not be updated. Do this before connecting an account.",
+  "shrinkWorking": "Checking pictures… {done} of {total}",
+  "shrinkNothing": "Your pictures are already as small as they can reasonably be.",
+  "shrinkFound": "{count} of {total} pictures can shrink from {before} to {after}, saving {saved}. Export a backup first if you want to keep the originals.",
+  "shrinkApply": "Shrink pictures",
+  "shrinkCancel": "Cancel",
+  "shrinkDone": "Pictures shrunk. Saved {saved}.",
+  "shrinkFailed": "Could not shrink pictures: {error}",
+  "@shrinkWorking": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@shrinkFound": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      },
+      "saved": {
+        "type": "String"
+      }
+    }
+  },
+  "@shrinkDone": {
+    "placeholders": {
+      "saved": {
+        "type": "String"
+      }
+    }
+  },
+  "@shrinkFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "stickyTitle": "Import from Windows Sticky Notes",
+  "stickySubtitle": "Copy your existing Sticky Notes into BetterNotes once. Sticky Notes itself is not changed.",
+  "stickyFound": "Found {count} notes with {pictures} pictures in Windows Sticky Notes ({already} already imported). Import them as new notes tagged \"sticky notes\"? Sticky Notes is not changed.",
+  "stickyNoneNew": "There are no new Sticky Notes to import.",
+  "stickyImport": "Import",
+  "stickyCancel": "Cancel",
+  "stickyWorking": "Importing… {done} of {total}",
+  "stickyDone": "Imported {count} notes and {pictures} pictures.",
+  "stickyDoneSkipped": "Imported {count} notes and {pictures} pictures. {skipped} items could not be imported or were empty.",
+  "stickyFailed": "Could not import Sticky Notes: {error}",
+  "@stickyFound": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "pictures": {
+        "type": "String"
+      },
+      "already": {
+        "type": "String"
+      }
+    }
+  },
+  "@stickyWorking": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@stickyDone": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "pictures": {
+        "type": "String"
+      }
+    }
+  },
+  "@stickyDoneSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "pictures": {
+        "type": "String"
+      },
+      "skipped": {
+        "type": "String"
+      }
+    }
+  },
+  "@stickyFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sortUpdatedOldest": "Least recently edited",
+  "sortCreatedOldest": "Oldest created",
+  "sortTitleDesc": "Title Z–A",
+  "sortReminder": "Reminder date",
+  "sortColor": "Color",
+  "sortLength": "Longest first",
+  "sortFavoritesFirst": "Favorites first",
+  "cardCreated": "Created {time}",
+  "@cardCreated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11,14 +11,29 @@ import '../data/app_log.dart';
 import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup.dart';
 import '../data/local_store.dart';
+import '../data/clipboard_image.dart';
+import '../data/image_shrink.dart';
 import '../data/note.dart';
+import '../data/sticky_import.dart';
 import '../data/revision.dart';
 import '../data/templates.dart';
 import 'note_editor_store.dart';
 
 enum LibraryView { notes, favorites, archive, trash, allActive, reminders }
 
-enum NoteSort { updated, created, title }
+/// How the library is ordered. The `*Oldest`/`Desc` values reverse their
+/// pair; names of the original three stay stable because they are saved.
+enum NoteSort {
+  updated,
+  updatedOldest,
+  created,
+  createdOldest,
+  title,
+  titleDesc,
+  reminder,
+  color,
+  length,
+}
 
 /// A named combination of search text, view, sort, and tags.
 class SavedFilter {
@@ -92,6 +107,7 @@ class NotesController extends NoteEditorStore {
   NoteSort noteSort = NoteSort.updated;
   List<String> selectedTags = [];
   bool compactView = false;
+  bool favoritesFirst = true;
   String? autoBackupFolder;
   int autoBackupKeep = 7;
   DateTime? autoBackupLast;
@@ -168,15 +184,36 @@ class NotesController extends NoteEditorStore {
         if (a.reminderFired != b.reminderFired) return a.reminderFired ? 1 : -1;
         return a.remindAt!.compareTo(b.remindAt!);
       }
-      if (libraryView != LibraryView.trash && a.favorite != b.favorite) {
+      if (favoritesFirst &&
+          libraryView != LibraryView.trash &&
+          a.favorite != b.favorite) {
         return a.favorite ? -1 : 1;
       }
       final order = switch (noteSort) {
         NoteSort.updated => b.updatedAt.compareTo(a.updatedAt),
+        NoteSort.updatedOldest => a.updatedAt.compareTo(b.updatedAt),
         NoteSort.created => b.createdAt.compareTo(a.createdAt),
+        NoteSort.createdOldest => a.createdAt.compareTo(b.createdAt),
         NoteSort.title => a.displayTitle.toLowerCase().compareTo(
           b.displayTitle.toLowerCase(),
         ),
+        NoteSort.titleDesc => b.displayTitle.toLowerCase().compareTo(
+          a.displayTitle.toLowerCase(),
+        ),
+        // Soonest reminder first; notes without one follow, newest edit first.
+        NoteSort.reminder =>
+          a.remindAt != null && b.remindAt != null
+              ? a.remindAt!.compareTo(b.remindAt!)
+              : a.remindAt != null
+              ? -1
+              : b.remindAt != null
+              ? 1
+              : b.updatedAt.compareTo(a.updatedAt),
+        NoteSort.color =>
+          a.colorIndex != b.colorIndex
+              ? a.colorIndex.compareTo(b.colorIndex)
+              : b.updatedAt.compareTo(a.updatedAt),
+        NoteSort.length => b.plainText.length.compareTo(a.plainText.length),
       };
       return order != 0 ? order : a.id.compareTo(b.id);
     });
@@ -188,19 +225,23 @@ class NotesController extends NoteEditorStore {
     NoteSort? sort,
     List<String>? tags,
     bool? compact,
+    bool? favoritesFirst,
     bool reset = false,
   }) => _enqueue(() async {
     final nextView = reset ? LibraryView.notes : view ?? libraryView;
     final nextSort = reset ? NoteSort.updated : sort ?? noteSort;
     final nextTags = reset ? <String>[] : normalizeTags(tags ?? selectedTags);
     final nextCompact = compact ?? compactView;
+    final nextFavoritesFirst = favoritesFirst ?? this.favoritesFirst;
     await store.setSetting('libraryOptions', {
       'view': nextView.name,
       'sort': nextSort.name,
       'tags': nextTags,
       'compact': nextCompact,
+      'favoritesFirst': nextFavoritesFirst,
     });
     compactView = nextCompact;
+    this.favoritesFirst = nextFavoritesFirst;
     libraryView = nextView;
     noteSort = nextSort;
     selectedTags = nextTags;
@@ -300,6 +341,9 @@ class NotesController extends NoteEditorStore {
   bool customWindowButtons = false;
   @override
   bool inlineImages = false;
+  Set<String> stickyImported = {};
+  @override
+  ImageQuality imageQuality = ImageQuality.balanced;
   @override
   bool alwaysShowNoteHeader = false;
   bool fastNoteOpening = true;
@@ -354,6 +398,15 @@ class NotesController extends NoteEditorStore {
     customWindowButtons =
         await store.getSetting<bool>('customWindowButtons') ?? false;
     inlineImages = await store.getSetting<bool>('inlineImages') ?? false;
+    stickyImported = {
+      ...?(await store.getSetting<List>('stickyImported'))?.whereType<String>(),
+    };
+    final imageQualityName = await store.getSetting<String>('imageQuality');
+    imageQuality =
+        ImageQuality.values
+            .where((value) => value.name == imageQualityName)
+            .firstOrNull ??
+        ImageQuality.balanced;
     alwaysShowNoteHeader =
         await store.getSetting<bool>('alwaysShowNoteHeader') ?? false;
     fastNoteOpening = await store.getSetting<bool>('fastNoteOpening') ?? true;
@@ -373,6 +426,7 @@ class NotesController extends NoteEditorStore {
         (options['tags'] as List? ?? const []).whereType<String>(),
       );
       compactView = options['compact'] as bool? ?? false;
+      favoritesFirst = options['favoritesFirst'] as bool? ?? true;
     }
     _lastOwner = ownerId;
     if (signedIn) await store.moveGuestNotes(ownerId);
@@ -757,6 +811,126 @@ class NotesController extends NoteEditorStore {
     customWindowButtons = value;
     notifyListeners();
   }
+
+  /// One-time copy of Windows Sticky Notes into new notes. Each Sticky Note is
+  /// imported once (its ID is remembered), so running this again only adds
+  /// notes created since. Pictures become attached images; the original
+  /// Sticky Notes data is never modified.
+  Future<StickyImportResult> importStickyNotes(
+    StickySource source, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final all = await source.notes();
+    final pending = [
+      for (final sticky in all)
+        if (!stickyImported.contains(sticky.id)) sticky,
+    ];
+    var imported = 0, empty = 0, pictures = 0, failedPictures = 0;
+    for (var i = 0; i < pending.length; i++) {
+      onProgress?.call(i, pending.length);
+      final sticky = pending[i];
+      final content = parseStickyText(sticky.text);
+      final imageIds = <String>[];
+      for (final file in sticky.mediaFiles) {
+        try {
+          final bytes = await source.media(file);
+          if (bytes == null) {
+            failedPictures++;
+            continue;
+          }
+          imageIds.add(
+            await cacheImage(
+              await prepareNoteImage(bytes, quality: imageQuality),
+            ),
+          );
+          pictures++;
+        } catch (_) {
+          failedPictures++;
+        }
+      }
+      if (content.plainText.trim().isEmpty && imageIds.isEmpty) {
+        empty++;
+        stickyImported = {...stickyImported, sticky.id};
+        continue;
+      }
+      await _enqueue(() async {
+        final now = DateTime.now().toUtc();
+        final note = Note.fresh(ownerId).copyWith(
+          delta: content.delta,
+          plainText: content.plainText,
+          colorIndex: stickyColorIndex(sticky.theme),
+          images: imageIds,
+          tags: ['sticky notes'],
+          createdAt: sticky.createdAt ?? sticky.updatedAt ?? now,
+          updatedAt: sticky.updatedAt ?? sticky.createdAt ?? now,
+        );
+        await store.putNote(note);
+        _replace(note);
+      });
+      stickyImported = {...stickyImported, sticky.id};
+      imported++;
+    }
+    await store.setSetting('stickyImported', stickyImported.toList());
+    onProgress?.call(pending.length, pending.length);
+    return StickyImportResult(
+      found: all.length,
+      imported: imported,
+      alreadyImported: all.length - pending.length,
+      empty: empty,
+      pictures: pictures,
+      failedPictures: failedPictures,
+    );
+  }
+
+  Future<void> setImageQuality(ImageQuality value) async {
+    await store.setSetting('imageQuality', value.name);
+    imageQuality = value;
+    notifyListeners();
+  }
+
+  /// Re-encodes every stored picture with the current quality setting and
+  /// returns what would change. Nothing is written until [applyImageShrink].
+  Future<ImageShrinkPlan> planImageShrink({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final ids = await store.imageIds();
+    final replacements = <String, Uint8List>{};
+    var before = 0;
+    var after = 0;
+    for (var i = 0; i < ids.length; i++) {
+      onProgress?.call(i, ids.length);
+      final bytes = await store.getImage(ids[i]);
+      if (bytes == null) continue;
+      before += bytes.length;
+      Uint8List? smaller;
+      if (imageQuality != ImageQuality.original && !_isGif(bytes)) {
+        smaller = await compute(shrinkRequest, (bytes, imageQuality.index));
+      }
+      if (smaller != null && smaller.length < bytes.length * 0.9) {
+        replacements[ids[i]] = smaller;
+        after += smaller.length;
+      } else {
+        after += bytes.length;
+      }
+    }
+    onProgress?.call(ids.length, ids.length);
+    return ImageShrinkPlan(
+      total: ids.length,
+      before: before,
+      after: after,
+      replacements: replacements,
+    );
+  }
+
+  /// Replaces the stored bytes of each picture in [plan]. Cannot be undone.
+  Future<void> applyImageShrink(ImageShrinkPlan plan) => _enqueue(() async {
+    for (final entry in plan.replacements.entries) {
+      await store.putImage(entry.key, entry.value);
+    }
+  });
+
+  static bool _isGif(Uint8List bytes) =>
+      bytes.length > 3 && bytes[0] == 0x47 && bytes[1] == 0x49;
 
   Future<void> setInlineImages(bool value) async {
     await store.setSetting('inlineImages', value);

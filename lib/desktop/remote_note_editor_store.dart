@@ -5,6 +5,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../data/image_shrink.dart';
 import '../data/note.dart';
 import '../data/revision.dart';
 import '../state/note_editor_store.dart';
@@ -31,6 +32,8 @@ class RemoteNoteEditorStore extends NoteEditorStore {
   bool alwaysShowNoteHeader = false;
   @override
   List<String> availableTags = const [];
+  @override
+  ImageQuality imageQuality = ImageQuality.balanced;
 
   Future<void> load() async {
     if (_noteId == null) return;
@@ -77,6 +80,11 @@ class RemoteNoteEditorStore extends NoteEditorStore {
     customWindowButtons = state['customWindowButtons'] as bool? ?? false;
     inlineImages = state['inlineImages'] as bool? ?? false;
     alwaysShowNoteHeader = state['alwaysShowNoteHeader'] as bool? ?? false;
+    imageQuality =
+        ImageQuality.values
+            .where((value) => value.name == state['imageQuality'])
+            .firstOrNull ??
+        ImageQuality.balanced;
     availableTags =
         (state['availableTags'] as List?)?.cast<String>() ?? const [];
     themeMode = switch (state['theme']) {

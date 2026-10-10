@@ -235,10 +235,12 @@ class CompactNoteTile extends StatelessWidget {
     required this.note,
     required this.onOpen,
     this.selected = false,
+    this.sort = NoteSort.updated,
   });
   final Note note;
   final VoidCallback onOpen;
   final bool selected;
+  final NoteSort sort;
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +250,7 @@ class CompactNoteTile extends StatelessWidget {
         ? note.plainText.trimLeft().split('\n').skip(1).join(' ').trim()
         : note.plainText.replaceAll('\n', ' ').trim();
     final detail = [
-      noteTime(note.updatedAt),
+      noteDateLabel(note, sort),
       if (note.tasks.total > 0) '${note.tasks.done}/${note.tasks.total} tasks',
       ?reminderLabel(note),
       if (note.tags.isNotEmpty) note.tags.join(', '),
@@ -319,10 +321,12 @@ class NoteCard extends StatelessWidget {
     required this.note,
     required this.controller,
     this.onOpen,
+    this.sort = NoteSort.updated,
   });
   final Note note;
   final NotesController controller;
   final VoidCallback? onOpen;
+  final NoteSort sort;
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +365,7 @@ class NoteCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        noteTime(note.updatedAt),
+                        noteDateLabel(note, sort),
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ),
@@ -588,6 +592,13 @@ String? reminderLabel(Note note) {
       ? l10n.reminderCardShown(reminderTime(at))
       : l10n.reminderCardLabel(reminderTime(at));
 }
+
+/// The date shown on a card: the creation date when sorting by creation,
+/// otherwise the last edit.
+String noteDateLabel(Note note, NoteSort sort) =>
+    sort == NoteSort.created || sort == NoteSort.createdOldest
+    ? currentL10n().cardCreated(noteTime(note.createdAt))
+    : noteTime(note.updatedAt);
 
 String noteTime(DateTime date) {
   final local = date.toLocal();

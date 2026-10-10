@@ -270,6 +270,8 @@ void main() {
             240,
             scrollable: find.byType(Scrollable).last,
           );
+          await tester.ensureVisible(find.text('Keyboard shortcuts'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Keyboard shortcuts'));
           await tester.pumpAndSettle();
           expect(find.text('In a note'), findsOneWidget);

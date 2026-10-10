@@ -1153,4 +1153,134 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bulkDoneArchived => 'Archived';
+
+  @override
+  String get imageQualityTitle => 'Picture storage';
+
+  @override
+  String get imageQualityHelp =>
+      'Pictures are compressed once, when you add them, to save space on this device, in backups, and online. The original is not kept.';
+
+  @override
+  String get imageQualityBalanced => 'Balanced (recommended)';
+
+  @override
+  String get imageQualitySmallest => 'Smallest files';
+
+  @override
+  String get imageQualityOriginal => 'Original (only shrink huge pictures)';
+
+  @override
+  String get shrinkTitle => 'Shrink saved pictures';
+
+  @override
+  String get shrinkSubtitle =>
+      'Re-compress the pictures already in your notes with the setting above. They are replaced by smaller copies and this cannot be undone.';
+
+  @override
+  String get shrinkSignedIn =>
+      'Not available while signed in: pictures that were already uploaded would not be updated. Do this before connecting an account.';
+
+  @override
+  String shrinkWorking(String done, String total) {
+    return 'Checking pictures… $done of $total';
+  }
+
+  @override
+  String get shrinkNothing =>
+      'Your pictures are already as small as they can reasonably be.';
+
+  @override
+  String shrinkFound(
+    String count,
+    String total,
+    String before,
+    String after,
+    String saved,
+  ) {
+    return '$count of $total pictures can shrink from $before to $after, saving $saved. Export a backup first if you want to keep the originals.';
+  }
+
+  @override
+  String get shrinkApply => 'Shrink pictures';
+
+  @override
+  String get shrinkCancel => 'Cancel';
+
+  @override
+  String shrinkDone(String saved) {
+    return 'Pictures shrunk. Saved $saved.';
+  }
+
+  @override
+  String shrinkFailed(String error) {
+    return 'Could not shrink pictures: $error';
+  }
+
+  @override
+  String get stickyTitle => 'Import from Windows Sticky Notes';
+
+  @override
+  String get stickySubtitle =>
+      'Copy your existing Sticky Notes into BetterNotes once. Sticky Notes itself is not changed.';
+
+  @override
+  String stickyFound(String count, String pictures, String already) {
+    return 'Found $count notes with $pictures pictures in Windows Sticky Notes ($already already imported). Import them as new notes tagged \"sticky notes\"? Sticky Notes is not changed.';
+  }
+
+  @override
+  String get stickyNoneNew => 'There are no new Sticky Notes to import.';
+
+  @override
+  String get stickyImport => 'Import';
+
+  @override
+  String get stickyCancel => 'Cancel';
+
+  @override
+  String stickyWorking(String done, String total) {
+    return 'Importing… $done of $total';
+  }
+
+  @override
+  String stickyDone(String count, String pictures) {
+    return 'Imported $count notes and $pictures pictures.';
+  }
+
+  @override
+  String stickyDoneSkipped(String count, String pictures, String skipped) {
+    return 'Imported $count notes and $pictures pictures. $skipped items could not be imported or were empty.';
+  }
+
+  @override
+  String stickyFailed(String error) {
+    return 'Could not import Sticky Notes: $error';
+  }
+
+  @override
+  String get sortUpdatedOldest => 'Least recently edited';
+
+  @override
+  String get sortCreatedOldest => 'Oldest created';
+
+  @override
+  String get sortTitleDesc => 'Title Z–A';
+
+  @override
+  String get sortReminder => 'Reminder date';
+
+  @override
+  String get sortColor => 'Color';
+
+  @override
+  String get sortLength => 'Longest first';
+
+  @override
+  String get sortFavoritesFirst => 'Favorites first';
+
+  @override
+  String cardCreated(String time) {
+    return 'Created $time';
+  }
 }

@@ -660,7 +660,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     try {
       final image = await ImagePicker().pickImage(source: source);
       if (image == null) return;
-      final bytes = await prepareNoteImage(await image.readAsBytes());
+      final bytes = await prepareNoteImage(
+        await image.readAsBytes(),
+        quality: widget.controller.imageQuality,
+      );
       await _addImage(bytes);
     } catch (error) {
       if (mounted) _message(context.l10n.noteCouldNotAddImage('$error'));
@@ -711,7 +714,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         }
         return false;
       }
-      final normalized = await prepareClipboardImage(bytes);
+      final normalized = await prepareClipboardImage(
+        bytes,
+        quality: widget.controller.imageQuality,
+      );
       final note = widget.controller.noteById(widget.noteId);
       if (!mounted || note == null) return false;
       await _addImage(normalized);

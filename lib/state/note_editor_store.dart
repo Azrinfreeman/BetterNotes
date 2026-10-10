@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../data/image_shrink.dart';
 import '../data/note.dart';
 import '../data/revision.dart';
 
@@ -29,6 +30,7 @@ abstract class NoteEditorStore extends ChangeNotifier {
   bool get customWindowButtons => false;
   bool get inlineImages => false;
   bool get alwaysShowNoteHeader => false;
+  ImageQuality get imageQuality => ImageQuality.balanced;
 
   Future<void> save(Note note);
   Future<void> delete(Note note);

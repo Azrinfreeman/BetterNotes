@@ -1992,6 +1992,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Archived'**
   String get bulkDoneArchived;
+
+  /// No description provided for @imageQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture storage'**
+  String get imageQualityTitle;
+
+  /// No description provided for @imageQualityHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Pictures are compressed once, when you add them, to save space on this device, in backups, and online. The original is not kept.'**
+  String get imageQualityHelp;
+
+  /// No description provided for @imageQualityBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced (recommended)'**
+  String get imageQualityBalanced;
+
+  /// No description provided for @imageQualitySmallest.
+  ///
+  /// In en, this message translates to:
+  /// **'Smallest files'**
+  String get imageQualitySmallest;
+
+  /// No description provided for @imageQualityOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original (only shrink huge pictures)'**
+  String get imageQualityOriginal;
+
+  /// No description provided for @shrinkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shrink saved pictures'**
+  String get shrinkTitle;
+
+  /// No description provided for @shrinkSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-compress the pictures already in your notes with the setting above. They are replaced by smaller copies and this cannot be undone.'**
+  String get shrinkSubtitle;
+
+  /// No description provided for @shrinkSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available while signed in: pictures that were already uploaded would not be updated. Do this before connecting an account.'**
+  String get shrinkSignedIn;
+
+  /// No description provided for @shrinkWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking pictures… {done} of {total}'**
+  String shrinkWorking(String done, String total);
+
+  /// No description provided for @shrinkNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pictures are already as small as they can reasonably be.'**
+  String get shrinkNothing;
+
+  /// No description provided for @shrinkFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {total} pictures can shrink from {before} to {after}, saving {saved}. Export a backup first if you want to keep the originals.'**
+  String shrinkFound(
+    String count,
+    String total,
+    String before,
+    String after,
+    String saved,
+  );
+
+  /// No description provided for @shrinkApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Shrink pictures'**
+  String get shrinkApply;
+
+  /// No description provided for @shrinkCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get shrinkCancel;
+
+  /// No description provided for @shrinkDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Pictures shrunk. Saved {saved}.'**
+  String shrinkDone(String saved);
+
+  /// No description provided for @shrinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not shrink pictures: {error}'**
+  String shrinkFailed(String error);
+
+  /// No description provided for @stickyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Windows Sticky Notes'**
+  String get stickyTitle;
+
+  /// No description provided for @stickySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy your existing Sticky Notes into BetterNotes once. Sticky Notes itself is not changed.'**
+  String get stickySubtitle;
+
+  /// No description provided for @stickyFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Found {count} notes with {pictures} pictures in Windows Sticky Notes ({already} already imported). Import them as new notes tagged \"sticky notes\"? Sticky Notes is not changed.'**
+  String stickyFound(String count, String pictures, String already);
+
+  /// No description provided for @stickyNoneNew.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no new Sticky Notes to import.'**
+  String get stickyNoneNew;
+
+  /// No description provided for @stickyImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get stickyImport;
+
+  /// No description provided for @stickyCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get stickyCancel;
+
+  /// No description provided for @stickyWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing… {done} of {total}'**
+  String stickyWorking(String done, String total);
+
+  /// No description provided for @stickyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} notes and {pictures} pictures.'**
+  String stickyDone(String count, String pictures);
+
+  /// No description provided for @stickyDoneSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} notes and {pictures} pictures. {skipped} items could not be imported or were empty.'**
+  String stickyDoneSkipped(String count, String pictures, String skipped);
+
+  /// No description provided for @stickyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import Sticky Notes: {error}'**
+  String stickyFailed(String error);
+
+  /// No description provided for @sortUpdatedOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Least recently edited'**
+  String get sortUpdatedOldest;
+
+  /// No description provided for @sortCreatedOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest created'**
+  String get sortCreatedOldest;
+
+  /// No description provided for @sortTitleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title Z–A'**
+  String get sortTitleDesc;
+
+  /// No description provided for @sortReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder date'**
+  String get sortReminder;
+
+  /// No description provided for @sortColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get sortColor;
+
+  /// No description provided for @sortLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest first'**
+  String get sortLength;
+
+  /// No description provided for @sortFavoritesFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites first'**
+  String get sortFavoritesFirst;
+
+  /// No description provided for @cardCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created {time}'**
+  String cardCreated(String time);
 }
 
 class _AppLocalizationsDelegate
