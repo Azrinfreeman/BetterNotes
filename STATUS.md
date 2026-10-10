@@ -1,6 +1,16 @@
 # BetterNotes project state
 
-Saved: **2026-10-09** · App version: **1.0.2+3** (Round A committed)
+Saved: **2026-10-10** · App version: **1.1.0+6** · `main` at the Round B/C/D, Sticky Notes import, picture shrinking and sort commits
+
+## Current state (read this first)
+
+- **Version 1.1.0+6**, all work committed on `main` (latest feature commit: picture shrinking, Sticky Notes import, more sort options). Working tree clean at save time. Analysis clean; full suite 126 passed + 1 gated test (`BN_TASK_INTEGRATION=1` touches Task Scheduler).
+- **Done and live-tested by the user:** Round A (hardening), Round B (duplicate/templates, tag manager, links, multi-select, Markdown/PDF export, compact view, saved searches, version history, Trash retention, word count), Round C (tray, quick-note hotkey, automatic backups, window recovery, reminders incl. scheduled task), Round D except mobile (installer, About/diagnostics/log, localization infrastructure).
+- **Built but not yet confirmed by the user in the app:** Settings -> Picture storage / Shrink saved pictures, Settings -> Import from Windows Sticky Notes (dry-run on a copy of their real data: 47 found, 46 importable, 36 pictures), the extra sort options and Favorites-first chip, the Snooze/Done banner, the interactive installer wizard.
+- **Packages in `dist` (git-ignored):** `BetterNotes-Setup-1.1.0.exe` and `BetterNotes-Windows-1.1.0-20261010-portable.zip` (+ .sha256) are build 1.1.0+6. The 20261009 portable ZIP is the older +4 build; older 1.0.x packages are kept. Build recipe: `flutter build windows --release`, then `ISCC.exe /DAppVersion=1.1.0 installer\BetterNotes.iss` (Inno Setup 6 is installed per-user), then zip the Release folder with `WINDOWS-PORTABLE.txt`.
+- **Pending on the user:** create the Supabase project (run the updated `supabase/schema.sql`, color check is 0-11) and Google OAuth client, enable Google in Supabase, add `http://127.0.0.1:48555/auth/callback`, then send the Project URL and publishable key. Next for me: put them in git-ignored `config.local.json`, rebuild with `--dart-define-from-file`, test sign-in as far as possible (the Google login click is the user's).
+- **Open items:** D6 Android/iOS (needs Android SDK or a Mac); no code-signing certificate (SmartScreen warning documented); about 400 strings are in `lib/l10n/app_en.arb` but there are no translations; Track E cloud (two-device sync verification, cloud columns for title/favorite/tags/archive/reminders, images already use the private `note-assets` bucket); optional Microsoft sign-in (Supabase Azure provider) was discussed, not built.
+- **Gotchas for next time:** Flutter at `C:\Users\azrin\develop\flutter`; run `flutter gen-l10n` after editing `app_en.arb` (a test blocks hard-coded widget text); shell heredocs and the Edit tool mangle double backslashes, so write scripts with the Write tool; the installer calls `better_notes.exe --quit` to close a running copy; never capture the whole screen.
 
 ## Resume here
 
