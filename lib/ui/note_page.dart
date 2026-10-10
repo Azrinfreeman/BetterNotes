@@ -630,6 +630,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.noteMovedToTrash),
+            // A snackbar with an action stays until dismissed unless told not to.
+            persist: false,
+            duration: const Duration(seconds: 6),
             action: SnackBarAction(
               label: context.l10n.noteUndo,
               onPressed: () async {
