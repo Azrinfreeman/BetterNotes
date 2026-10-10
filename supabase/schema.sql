@@ -4,7 +4,7 @@ create table if not exists public.notes (
   owner_id uuid not null references auth.users(id) on delete cascade,
   content jsonb not null default '[{"insert":"\n"}]'::jsonb,
   plain_text text not null default '',
-  color_index integer not null default 0 check (color_index between 0 and 5),
+  color_index integer not null default 0 check (color_index between 0 and 11),
   images jsonb not null default '[]'::jsonb,
   strokes jsonb not null default '[]'::jsonb,
   created_at timestamptz not null,

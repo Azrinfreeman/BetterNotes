@@ -317,6 +317,7 @@ class DesktopCoordinator with WindowListener {
       'inlineImages': controller.inlineImages,
       'alwaysShowNoteHeader': controller.alwaysShowNoteHeader,
       'availableTags': controller.availableTags,
+      'imageQuality': controller.imageQuality.name,
     };
   }
 

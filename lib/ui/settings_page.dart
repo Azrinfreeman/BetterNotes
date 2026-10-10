@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import '../app_info.dart';
 import '../auth/sign_in.dart';
 import '../data/backup.dart';
+import '../data/image_shrink.dart';
+import '../data/sticky_reader.dart';
 import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup_files.dart' as backup_files;
 import '../desktop/auto_start.dart';
@@ -138,6 +140,185 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } finally {
       if (mounted) setState(() => _workingFiles = false);
+    }
+  }
+
+  static String _formatBytes(int bytes) => bytes >= 1024 * 1024
+      ? '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB'
+      : '${(bytes / 1024).toStringAsFixed(0)} KB';
+
+  Future<void> _importStickyNotes() async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    StickyNotesReader? reader;
+    try {
+      reader = await StickyNotesReader.open();
+      final all = await reader.notes();
+      final fresh = all
+          .where((note) => !widget.controller.stickyImported.contains(note.id))
+          .toList();
+      if (fresh.isEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.stickyNoneNew)));
+        return;
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.stickyTitle),
+          content: Text(
+            l10n.stickyFound(
+              '${fresh.length}',
+              '${fresh.fold<int>(0, (n, note) => n + note.mediaFiles.length)}',
+              '${all.length - fresh.length}',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.stickyCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.stickyImport),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      final progress = ValueNotifier<String>(
+        l10n.stickyWorking('0', '${fresh.length}'),
+      );
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              Expanded(
+                child: ValueListenableBuilder<String>(
+                  valueListenable: progress,
+                  builder: (context, text, _) => Text(text),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      try {
+        final result = await widget.controller.importStickyNotes(
+          reader,
+          onProgress: (done, total) =>
+              progress.value = l10n.stickyWorking('$done', '$total'),
+        );
+        navigator.pop();
+        final skipped = result.empty + result.failedPictures;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              skipped == 0
+                  ? l10n.stickyDone('${result.imported}', '${result.pictures}')
+                  : l10n.stickyDoneSkipped(
+                      '${result.imported}',
+                      '${result.pictures}',
+                      '$skipped',
+                    ),
+            ),
+          ),
+        );
+      } catch (_) {
+        navigator.pop();
+        rethrow;
+      }
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.stickyFailed('$error'))),
+      );
+    } finally {
+      await reader?.close();
+    }
+  }
+
+  Future<void> _shrinkStoredImages() async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final progress = ValueNotifier<String>(l10n.shrinkWorking('0', '…'));
+    final navigator = Navigator.of(context);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(
+              child: ValueListenableBuilder<String>(
+                valueListenable: progress,
+                builder: (context, text, _) => Text(text),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    ImageShrinkPlan plan;
+    try {
+      plan = await widget.controller.planImageShrink(
+        onProgress: (done, total) =>
+            progress.value = l10n.shrinkWorking('$done', '$total'),
+      );
+    } catch (error) {
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.shrinkFailed('$error'))),
+      );
+      return;
+    }
+    navigator.pop();
+    if (!mounted) return;
+    if (plan.replacements.isEmpty) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.shrinkNothing)));
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.shrinkTitle),
+        content: Text(
+          l10n.shrinkFound(
+            '${plan.replacements.length}',
+            '${plan.total}',
+            _formatBytes(plan.before),
+            _formatBytes(plan.after),
+            _formatBytes(plan.saved),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.shrinkCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.shrinkApply),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.controller.applyImageShrink(plan);
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.shrinkDone(_formatBytes(plan.saved)))),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.shrinkFailed('$error'))),
+      );
     }
   }
 
@@ -420,6 +601,58 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(context.l10n.imageQualityTitle),
+                Text(context.l10n.imageQualityHelp),
+                DropdownButton<ImageQuality>(
+                  key: const ValueKey('image-quality'),
+                  isExpanded: true,
+                  value: widget.controller.imageQuality,
+                  onChanged: (value) {
+                    if (value != null) widget.controller.setImageQuality(value);
+                  },
+                  items: [
+                    DropdownMenuItem(
+                      value: ImageQuality.balanced,
+                      child: Text(context.l10n.imageQualityBalanced),
+                    ),
+                    DropdownMenuItem(
+                      value: ImageQuality.smallest,
+                      child: Text(context.l10n.imageQualitySmallest),
+                    ),
+                    DropdownMenuItem(
+                      value: ImageQuality.original,
+                      child: Text(context.l10n.imageQualityOriginal),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (stickyNotesFolder() != null)
+            ListTile(
+              key: const ValueKey('sticky-import'),
+              leading: const Icon(Icons.sticky_note_2_outlined),
+              title: Text(context.l10n.stickyTitle),
+              subtitle: Text(context.l10n.stickySubtitle),
+              onTap: _importStickyNotes,
+            ),
+          ListTile(
+            key: const ValueKey('shrink-images'),
+            leading: const Icon(Icons.compress_outlined),
+            title: Text(context.l10n.shrinkTitle),
+            subtitle: Text(
+              widget.controller.signedIn
+                  ? context.l10n.shrinkSignedIn
+                  : context.l10n.shrinkSubtitle,
+            ),
+            enabled: !widget.controller.signedIn,
+            onTap: widget.controller.signedIn ? null : _shrinkStoredImages,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

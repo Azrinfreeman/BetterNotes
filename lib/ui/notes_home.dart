@@ -141,6 +141,7 @@ class _NotesHomeState extends State<NotesHome> {
     NoteSort? sort,
     List<String>? tags,
     bool? compact,
+    bool? favoritesFirst,
     bool reset = false,
   }) async {
     try {
@@ -149,6 +150,7 @@ class _NotesHomeState extends State<NotesHome> {
         sort: sort,
         tags: tags,
         compact: compact,
+        favoritesFirst: favoritesFirst,
         reset: reset,
       );
       if (mounted) {
@@ -474,12 +476,14 @@ class _NotesHomeState extends State<NotesHome> {
                     key: ValueKey(note.id),
                     note: note,
                     selected: selected,
+                    sort: widget.controller.noteSort,
                     onOpen: () => _tapNote(note.id),
                   )
                 : NoteCard(
                     key: ValueKey(note.id),
                     note: note,
                     controller: widget.controller,
+                    sort: widget.controller.noteSort,
                     onOpen: () => _tapNote(note.id),
                   ),
           ),
@@ -721,41 +725,57 @@ class _NotesHomeState extends State<NotesHome> {
                                             ? constraints.maxWidth
                                             : constraints.maxWidth - 148,
                                         child: DropdownButton<NoteSort>(
+                                          key: const ValueKey('sort-order'),
                                           value: widget.controller.noteSort,
                                           isExpanded: true,
                                           onChanged: (sort) =>
                                               _options(sort: sort),
                                           items: [
-                                            DropdownMenuItem(
-                                              value: NoteSort.updated,
-                                              child: Text(
-                                                context
-                                                    .l10n
-                                                    .notesHomeRecentlyEdited,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                            for (final entry in {
+                                              NoteSort.updated: context
+                                                  .l10n
+                                                  .notesHomeRecentlyEdited,
+                                              NoteSort.updatedOldest: context
+                                                  .l10n
+                                                  .sortUpdatedOldest,
+                                              NoteSort.created: context
+                                                  .l10n
+                                                  .notesHomeNewestCreated,
+                                              NoteSort.createdOldest: context
+                                                  .l10n
+                                                  .sortCreatedOldest,
+                                              NoteSort.title:
+                                                  context.l10n.notesHomeTitleAZ,
+                                              NoteSort.titleDesc:
+                                                  context.l10n.sortTitleDesc,
+                                              NoteSort.reminder:
+                                                  context.l10n.sortReminder,
+                                              NoteSort.color:
+                                                  context.l10n.sortColor,
+                                              NoteSort.length:
+                                                  context.l10n.sortLength,
+                                            }.entries)
+                                              DropdownMenuItem(
+                                                value: entry.key,
+                                                child: Text(
+                                                  entry.value,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
                                               ),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: NoteSort.created,
-                                              child: Text(
-                                                context
-                                                    .l10n
-                                                    .notesHomeNewestCreated,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: NoteSort.title,
-                                              child: Text(
-                                                context.l10n.notesHomeTitleAZ,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
                                           ],
                                         ),
+                                      ),
+                                      FilterChip(
+                                        key: const ValueKey('favorites-first'),
+                                        label: Text(
+                                          context.l10n.sortFavoritesFirst,
+                                        ),
+                                        selected:
+                                            widget.controller.favoritesFirst,
+                                        onSelected: (value) =>
+                                            _options(favoritesFirst: value),
                                       ),
                                       TextButton(
                                         onPressed: () {

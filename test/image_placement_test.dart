@@ -24,6 +24,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: SettingsPage(controller: controller)),
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('image-placement')),
+      200,
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('image-placement')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('image-placement')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Within note').last);

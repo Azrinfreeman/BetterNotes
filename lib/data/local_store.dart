@@ -157,6 +157,9 @@ class LocalStore {
     return base64Decode(value['base64'] as String);
   }
 
+  Future<List<String>> imageIds() async =>
+      (await _assets.findKeys(database)).toList();
+
   Future<void> deleteImage(String imageId) async {
     await _assets.record(imageId).delete(database);
   }
