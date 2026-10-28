@@ -23,6 +23,7 @@ import 'find_bar.dart';
 import 'note_desktop_header.dart';
 import 'note_details_dialog.dart';
 import 'note_image_embed.dart';
+import 'note_quill_controller.dart';
 import 'reminder_dialog.dart';
 import 'shortcuts_help.dart';
 import 'version_history.dart';
@@ -53,7 +54,7 @@ class NotePage extends StatefulWidget {
 }
 
 class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
-  late final quill.QuillController _editor;
+  late final NoteQuillController _editor;
   final FocusNode _editorFocus = FocusNode();
   final _quillKey = GlobalKey<quill.QuillEditorState>();
   final _findText = TextEditingController();
@@ -65,6 +66,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
   final Set<String> _inlineIds = {};
   bool _addingImage = false;
   bool _secondaryPointer = false;
+  bool _caretRevealScheduled = false;
 
   bool get _desktopEditorMenu =>
       !kIsWeb &&
@@ -106,7 +108,13 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     final note = widget.controller.noteById(widget.noteId)!;
     _observedDocument = _savedDocument = jsonEncode(note.delta);
     _inlineIds.addAll(inlineImageIds(note.delta));
-    _editor = quill.QuillController(
+    _editor = NoteQuillController(
+      noteId: widget.noteId,
+      onClipboardError: (error) {
+        if (mounted) {
+          _message(context.l10n.noteCouldNotCompleteThatAction('$error'));
+        }
+      },
       document: quill.Document.fromJson(note.delta),
       selection: const TextSelection.collapsed(offset: 0),
       config: quill.QuillControllerConfig(
@@ -469,6 +477,20 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
   }
 
   void _scheduleSave() {
+    // Quill's automatic caret scrolling only runs with its own scroll view.
+    // Our shared body scroll view must reveal the caret after layout instead.
+    if (_editorFocus.hasFocus && !_caretRevealScheduled) {
+      _caretRevealScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _caretRevealScheduled = false;
+        if (!mounted || !_editorFocus.hasFocus || !_editor.selection.isValid) {
+          return;
+        }
+        _quillKey.currentState?.editableTextKey.currentState?.bringIntoView(
+          _editor.selection.extent,
+        );
+      });
+    }
     final delta = _editor.document.toDelta().toJson();
     final encoded = jsonEncode(delta);
     if (encoded == _observedDocument) return; // Selection is not an edit.
@@ -680,9 +702,13 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
   Future<bool> _pasteClipboard() async {
     if (await _pasteImage(silentWhenEmpty: true)) return true;
     final selection = _editor.selection;
-    if (!selection.isValid || selection.isCollapsed) return false;
+    if (!selection.isValid || selection.isCollapsed) {
+      return _editor.pasteCopiedText();
+    }
     final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim();
-    if (text == null || !_urlPattern.hasMatch(text)) return false;
+    if (text == null || !_urlPattern.hasMatch(text)) {
+      return _editor.pasteCopiedText();
+    }
     _editor.formatText(
       selection.start,
       selection.end - selection.start,
@@ -964,7 +990,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                 child: SafeArea(
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 790),
+                      constraints: const BoxConstraints.expand(),
                       child: Column(
                         children: [
                           if (widget.controller case final store
@@ -993,125 +1019,148 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                               onClose: _dismissFind,
                             ),
                           Expanded(
-                            child: ListView(
-                              padding: const EdgeInsets.all(20),
-                              children: [
-                                for (final imageId in note.images.where(
-                                  (id) => !_inlineIds.contains(id),
-                                ))
-                                  NoteImageCard(
-                                    controller: widget.controller,
-                                    noteId: note.id,
-                                    imageId: imageId,
-                                    onRemove: () =>
-                                        widget.controller.removeImage(
-                                          widget.controller.noteById(note.id)!,
-                                          imageId,
-                                        ),
-                                  ),
-                                if (note.strokes.isNotEmpty)
-                                  InkPreview(
-                                    strokes: note.strokes,
-                                    onTap: () => _editInk(note),
-                                  ),
-                                Listener(
-                                  onPointerDown: (event) => _secondaryPointer =
-                                      event.kind == PointerDeviceKind.mouse &&
-                                      event.buttons == kSecondaryMouseButton,
-                                  onPointerUp: (event) {
-                                    if (!_secondaryPointer ||
-                                        !_desktopEditorMenu) {
-                                      return;
-                                    }
-                                    _secondaryPointer = false;
-                                    // Let Quill finish selecting the clicked word.
-                                    final position = event.position;
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (mounted) {
-                                            unawaited(
-                                              _showEditorMenu(position),
-                                            );
-                                          }
-                                        });
-                                    WidgetsBinding.instance.scheduleFrame();
-                                  },
-                                  child: SizedBox(
-                                    height: 420,
-                                    child: quill.QuillEditor.basic(
-                                      key: _quillKey,
-                                      controller: _editor,
-                                      focusNode: _editorFocus,
-                                      config: quill.QuillEditorConfig(
-                                        // Windows/desktop uses _showEditorMenu: its
-                                        // popup route is reliable in note windows,
-                                        // where the overlay menu ignored clicks.
-                                        contextMenuBuilder: (context, state) =>
-                                            _desktopEditorMenu
-                                            ? const SizedBox.shrink()
-                                            : AdaptiveTextSelectionToolbar.buttonItems(
-                                                anchors:
-                                                    state.contextMenuAnchors,
-                                                buttonItems: [
-                                                  ...state
-                                                      .contextMenuButtonItems,
-                                                  if (!_editor
-                                                      .selection
-                                                      .isCollapsed)
-                                                    ContextMenuButtonItem(
-                                                      label: context
-                                                          .l10n
-                                                          .noteDesktopHeaderChangeColor,
-                                                      onPressed: () {
-                                                        state.hideToolbar();
-                                                        _chooseTextColor(
-                                                          quill.Attribute.color,
-                                                        );
-                                                      },
-                                                    ),
-                                                ],
-                                              ),
-                                        embedBuilders: [
-                                          NoteImageEmbedBuilder(
-                                            store: widget.controller,
-                                            noteId: note.id,
-                                            onRemove: _removeInlineImage,
-                                          ),
-                                        ],
-                                        placeholder:
-                                            context.l10n.noteWriteANote,
-                                        padding: const EdgeInsets.all(4),
-                                        // Resolve Windows Backspace in the editor's
-                                        // own Actions scope, including held-key repeats.
-                                        customShortcuts:
-                                            !kIsWeb &&
-                                                defaultTargetPlatform ==
-                                                    TargetPlatform.windows
-                                            ? const {
-                                                SingleActivator(
-                                                  LogicalKeyboardKey.backspace,
-                                                ): DeleteCharacterIntent(
-                                                  forward: false,
-                                                ),
-                                                SingleActivator(
-                                                  LogicalKeyboardKey.backspace,
-                                                  shift: true,
-                                                ): DeleteCharacterIntent(
-                                                  forward: false,
-                                                ),
-                                                SingleActivator(
-                                                  LogicalKeyboardKey.backspace,
-                                                  control: true,
-                                                ): DeleteToNextWordBoundaryIntent(
-                                                  forward: false,
-                                                ),
+                            child: LayoutBuilder(
+                              builder: (context, viewport) => SingleChildScrollView(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (final imageId in note.images.where(
+                                      (id) => !_inlineIds.contains(id),
+                                    ))
+                                      NoteImageCard(
+                                        controller: widget.controller,
+                                        noteId: note.id,
+                                        imageId: imageId,
+                                        onRemove: () =>
+                                            widget.controller.removeImage(
+                                              widget.controller.noteById(
+                                                note.id,
+                                              )!,
+                                              imageId,
+                                            ),
+                                      ),
+                                    if (note.strokes.isNotEmpty)
+                                      InkPreview(
+                                        strokes: note.strokes,
+                                        onTap: () => _editInk(note),
+                                      ),
+                                    Listener(
+                                      onPointerDown: (event) =>
+                                          _secondaryPointer =
+                                              event.kind ==
+                                                  PointerDeviceKind.mouse &&
+                                              event.buttons ==
+                                                  kSecondaryMouseButton,
+                                      onPointerUp: (event) {
+                                        if (!_secondaryPointer ||
+                                            !_desktopEditorMenu) {
+                                          return;
+                                        }
+                                        _secondaryPointer = false;
+                                        // Let Quill finish selecting the clicked word.
+                                        final position = event.position;
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                unawaited(
+                                                  _showEditorMenu(position),
+                                                );
                                               }
-                                            : null,
+                                            });
+                                        WidgetsBinding.instance.scheduleFrame();
+                                      },
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: (viewport.maxHeight - 40)
+                                              .clamp(120.0, double.infinity),
+                                        ),
+                                        child: quill.QuillEditor.basic(
+                                          key: _quillKey,
+                                          controller: _editor,
+                                          focusNode: _editorFocus,
+                                          config: quill.QuillEditorConfig(
+                                            scrollable: false,
+                                            // Windows/desktop uses _showEditorMenu: its
+                                            // popup route is reliable in note windows,
+                                            // where the overlay menu ignored clicks.
+                                            contextMenuBuilder:
+                                                (
+                                                  context,
+                                                  state,
+                                                ) => _desktopEditorMenu
+                                                ? const SizedBox.shrink()
+                                                : AdaptiveTextSelectionToolbar.buttonItems(
+                                                    anchors: state
+                                                        .contextMenuAnchors,
+                                                    buttonItems: [
+                                                      ...state
+                                                          .contextMenuButtonItems,
+                                                      if (!_editor
+                                                          .selection
+                                                          .isCollapsed)
+                                                        ContextMenuButtonItem(
+                                                          label: context
+                                                              .l10n
+                                                              .noteDesktopHeaderChangeColor,
+                                                          onPressed: () {
+                                                            state.hideToolbar();
+                                                            _chooseTextColor(
+                                                              quill
+                                                                  .Attribute
+                                                                  .color,
+                                                            );
+                                                          },
+                                                        ),
+                                                    ],
+                                                  ),
+                                            embedBuilders: [
+                                              NoteImageEmbedBuilder(
+                                                store: widget.controller,
+                                                noteId: note.id,
+                                                onRemove: _removeInlineImage,
+                                              ),
+                                            ],
+                                            placeholder:
+                                                context.l10n.noteWriteANote,
+                                            padding: const EdgeInsets.all(4),
+                                            // Resolve Windows Backspace in the editor's
+                                            // own Actions scope, including held-key repeats.
+                                            customShortcuts:
+                                                !kIsWeb &&
+                                                    defaultTargetPlatform ==
+                                                        TargetPlatform.windows
+                                                ? const {
+                                                    SingleActivator(
+                                                      LogicalKeyboardKey
+                                                          .backspace,
+                                                    ): DeleteCharacterIntent(
+                                                      forward: false,
+                                                    ),
+                                                    SingleActivator(
+                                                      LogicalKeyboardKey
+                                                          .backspace,
+                                                      shift: true,
+                                                    ): DeleteCharacterIntent(
+                                                      forward: false,
+                                                    ),
+                                                    SingleActivator(
+                                                      LogicalKeyboardKey
+                                                          .backspace,
+                                                      control: true,
+                                                    ): DeleteToNextWordBoundaryIntent(
+                                                      forward: false,
+                                                    ),
+                                                  }
+                                                : null,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                           Material(
@@ -1309,11 +1358,9 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       }
       switch (choice) {
         case 'cut':
-          // ignore: experimental_member_use
-          _editor.clipboardSelection(false);
+          await _editor.copySelection(copy: false);
         case 'copy':
-          // ignore: experimental_member_use
-          _editor.clipboardSelection(true);
+          await _editor.copySelection();
         case 'paste':
           // ignore: experimental_member_use
           await _editor.clipboardPaste();

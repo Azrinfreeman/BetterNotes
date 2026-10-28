@@ -25,6 +25,21 @@ class _NoRichClipboardBridge extends QuillNativeBridgePlatform {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('betternotes/clipboard'),
+          (call) async => call.method == 'read' ? '' : null,
+        );
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('betternotes/clipboard'),
+          null,
+        );
+  });
+
   test('notes, images, and deletion survive a controller restart', () async {
     final db = await databaseFactoryMemory.openDatabase('note-flow-test.db');
     final store = LocalStore.fromDatabase(db);

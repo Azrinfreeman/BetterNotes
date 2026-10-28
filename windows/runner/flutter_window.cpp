@@ -11,6 +11,7 @@
 
 #include "resource.h"
 #include "startup_registration.h"
+#include "note_clipboard.h"
 
 namespace {
 constexpr UINT kTrayIconId = 1;
@@ -44,6 +45,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterNoteClipboard(flutter_controller_.get());
   command_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "betternotes/windows",
@@ -150,6 +152,7 @@ bool FlutterWindow::OnCreate() {
     auto *view_controller =
         reinterpret_cast<flutter::FlutterViewController *>(controller);
     RegisterPlugins(view_controller->engine());
+    RegisterNoteClipboard(view_controller);
   });
   taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
