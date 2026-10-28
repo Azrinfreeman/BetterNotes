@@ -10,6 +10,7 @@ add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "jump_list.cpp"
   "main.cpp"
+  "note_clipboard.cpp"
   "startup_registration.cpp"
   "utils.cpp"
   "win32_window.cpp"

@@ -1,3 +1,74 @@
+# BetterNotes — copy/paste and resizing fixes
+
+**Prepared and implemented: 2026-10-13, version 1.1.1+8.** The proposal below was approved with “proceed.” Implementation outcomes follow; the original steps are retained for context.
+
+- Copy/Cut now use `NoteQuillController` and a native Windows clipboard channel registered for the main and child engines. It publishes Unicode text and BetterNotes formatting under one clipboard lock with a valid owner window, retries briefly if busy, and awaits success before Cut removes an unchanged selection. Empty selections leave the clipboard intact.
+- Native integration verification in `tools/clipboard_smoke.dart` passed seven checks using an in-memory notebook: real Windows text copy, formatting across note controllers, empty-selection preservation, safe Cut, and native resizing. UI automation lost foreground focus, so its early blank-copy observations are not reliable proof of the original trigger; the unconditional empty write is confirmed in the dependency source.
+- Removed the fixed editor height and width cap. One body scroll view handles expanding text, legacy pictures, and ink; a cursor reveal callback keeps long-note editing reachable. Focused tests verify menu/keyboard Copy, resize growth, cursor scrolling, existing paste, image, styling, accessibility, and find behavior.
+- Existing cloud data and saved note formats are unchanged. Copying selections containing embedded images into another note still falls back to text rather than inserting broken image IDs. New image-copy formats are outside this fix.
+
+## Reported problems
+
+1. Copying text from a note and pasting it produces blank content.
+2. The writing area does not use the extra space when the note window is resized.
+
+## Findings from source inspection
+
+- Both the desktop right-click Copy/Cut menu and the editor's keyboard actions use Flutter Quill 11.6.0's `clipboardSelection`. That method first assigns `copiedImageUrl = null`, whose setter writes an empty string to the system clipboard. It then writes the selected text if the selection is not collapsed. Neither clipboard write is awaited. An empty selection can therefore clear the clipboard, and the two writes are a candidate for the reported failure. **The actual trigger has not yet been reproduced.**
+- The desktop popup snapshots and restores the selection, but the fix must also verify selection and focus after opening the menu, and in separate or reused note windows.
+- In `lib/ui/note_page.dart`, the editor is inside `SizedBox(height: 420)` and the note body is inside `ConstrainedBox(maxWidth: 790)`. An outer `ListView` surrounds the editor. These fixed limits explain why larger windows do not provide a correspondingly larger writing area and can produce nested scrolling.
+- Existing tests exercise text/image paste and small-window overflow, but do not prove that selected text reaches the real Windows clipboard or that the editor grows after resizing.
+
+## Intended behavior
+
+- Ctrl+C and right-click Copy put the selected text on the clipboard. Ctrl+X and Cut do the same, then remove the selection only after the write succeeds. With no selection, Copy/Cut leave the clipboard and document unchanged.
+- Pasting works within the same note, between separate note windows, and between BetterNotes and other Windows apps. Existing image paste, URL-over-selection linking, and Ctrl+Shift+V plain-text paste remain covered by regression checks.
+- Preserve the existing supported formatting behavior. Verify formatted text explicitly; do not silently reduce every paste to plain text to solve the clipboard defect.
+- The writing area fills the available width and remaining height of a note window. Widening rewraps text; increasing height exposes more content. Resizing changes layout, not font size or saved text styles.
+- Long notes remain scrollable, the caret stays reachable, and the formatting controls remain usable in small windows and with large accessibility text.
+
+## Implementation steps after approval
+
+### 1. Confirm the clipboard failure
+
+- Use a disposable test note with short multiline text and formatting. Compare Ctrl+C/Ctrl+V and right-click Copy/Paste, including copying to Notepad and into another BetterNotes window.
+- Check collapsed versus non-collapsed selections and focus changes around the popup. Record only the trigger and outcome; do not log private note or clipboard content.
+- Verify whether the failure is the empty clipboard write, selection loss, clipboard contention, or another path before choosing the final patch.
+
+### 2. Fix copy and cut consistently
+
+- Add a small app-owned copy/cut operation using a validated snapshot of the selected document range and an awaited clipboard write. Avoid the unconditional empty write.
+- Route the desktop menu and editor-scoped keyboard actions through that operation. Keep search boxes, title fields, and dialogs using their normal text shortcuts.
+- Preserve supported rich-text copying using the existing clipboard/document facilities where reliable; choose the smallest approach supported by the reproduction. Do not edit the global package cache or upgrade dependencies without a demonstrated need.
+- For Cut, verify the document/selection still matches after awaiting the clipboard write before removing text. On write failure, retain the note content and show the existing localized action error.
+- Keep image/embed copy handling explicit so custom image references do not become broken attachments in another note. This bug fix does not promise new image-copy formats.
+
+### 3. Make the editor respond to window size
+
+- Replace the fixed 420-pixel editor height with constraints derived from the available body space and remove the 790-pixel cap for desktop note editing.
+- Consolidate the scrolling arrangement so text, legacy image attachments, and ink remain reachable without an independently fixed-height text box. Select the concrete layout after checking Quill's bounded/expanding and non-scrolling configurations with existing find-in-note behavior.
+- Keep a sensible minimum writing area, account for the header, reminder/find bars, expanded text-style panel, and mobile keyboard, and retain existing padding.
+- Check inline image sizing, selection dragging, caret visibility, find navigation, and header behavior after the layout change. Do not change saved window bounds or document formatting.
+
+### 4. Verify and deliver
+
+- Add focused regression coverage for a successful selected-text copy, no-selection copy preserving the previous clipboard, and cut failure retaining content. Include menu and keyboard routing where practical. Use a controlled clipboard in widget tests; separately check the real Windows clipboard.
+- Add a resize regression that measures the editor at small, tall, and wide sizes and verifies growth/reflow, plus long-content scrolling and the existing large-text check.
+- Run formatting on changed Dart files, static analysis once, and the relevant existing clipboard, image placement, text style, find, and accessibility tests. Broaden only for a concrete regression risk.
+- Build Windows once after the changes settle. Confirm copy to/from Notepad, copy between note windows, and window resizing in the running release. No restart of Windows is needed.
+- Update `STATUS.md` with the actual cause, fixes, and verification. If providing an updated installer/portable release, set its version before the final build and package that build once. Commit only if requested.
+
+## Acceptance criteria
+
+- Selected multiline text pastes correctly into Notepad and another note through both keyboard and desktop menu actions.
+- Copy/Cut without a selection do not blank the existing clipboard. Failed Cut does not remove text.
+- Existing supported formatting, image paste, plain-text paste, and URL linking continue to work.
+- A taller window increases the usable writing area; a wider window increases line width and rewraps text. Small windows and large text have no new overflow or inaccessible editing controls.
+
+---
+
+# Earlier implementation plans
+
 # BetterNotes — next-round plan: harden, polish, extend (proposal)
 
 **Proposed on 2026-10-09. Planning only — nothing below is implemented, and no scope is approved yet.** Choose rounds (or individual items) before any code changes. The roadmap that follows this section (offline usefulness plan) is complete and kept as history.
