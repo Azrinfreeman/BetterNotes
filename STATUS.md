@@ -219,3 +219,5 @@ This section preserves historical checks from 2026-10-08. The latest verificatio
 - Complete installer/signing, broader screen-reader and accessibility checks, and release testing.
 
 The app is currently a usable **local Windows and web build** and source project, with a portable Windows archive. It is not a finished all-platform release. The cloud path is wired but unverified until the project owner connects credentials.
+
+- GitHub presentation (2026-10-28): README rewritten as a project overview; detailed usage moved to `docs/USER_GUIDE.md`; MIT `LICENSE` added; repo made public at github.com/Azrinfreeman/BetterNotes with the 1.1.1 portable ZIP as a release. Docs only; no builds rerun.
