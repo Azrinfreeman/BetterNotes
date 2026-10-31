@@ -14,6 +14,8 @@ import 'settings_page.dart';
 import 'bulk_actions.dart';
 import 'shortcuts_help.dart';
 import 'tag_manager.dart';
+import 'theme/notes_theme.dart';
+import 'theme/notes_chrome.dart';
 
 class NotesHome extends StatefulWidget {
   const NotesHome({
@@ -35,6 +37,9 @@ class _NotesHomeState extends State<NotesHome> {
   final _searchFocus = FocusNode();
   final _libraryScroll = ScrollController();
   bool _creating = false;
+  bool _filtersOpen = false;
+  bool _sidebarOpen = true;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final Set<String> _openingNotes = {};
   late int _lastDeletion;
 
@@ -495,7 +500,7 @@ class _NotesHomeState extends State<NotesHome> {
               child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    border: Border.all(color: primary, width: 3),
+                    border: Border.all(color: primary, width: 2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
@@ -579,6 +584,417 @@ class _NotesHomeState extends State<NotesHome> {
     });
   }
 
+  Map<LibraryView, String> get _views => {
+    LibraryView.notes: context.l10n.viewNotes,
+    LibraryView.allActive: context.l10n.notesHomeAllActive,
+    LibraryView.favorites: context.l10n.viewFavorites,
+    LibraryView.reminders: context.l10n.viewReminders,
+    LibraryView.archive: context.l10n.viewArchive,
+    LibraryView.trash: context.l10n.viewTrash,
+  };
+
+  static const _viewIcons = {
+    LibraryView.notes: Icons.notes_rounded,
+    LibraryView.allActive: Icons.library_books_outlined,
+    LibraryView.favorites: Icons.star_outline_rounded,
+    LibraryView.reminders: Icons.notifications_none_rounded,
+    LibraryView.archive: Icons.archive_outlined,
+    LibraryView.trash: Icons.delete_outline_rounded,
+  };
+
+  Widget _navigation({bool drawer = false}) => Material(
+    color: NotesColors.of(context).sidebar,
+    child: SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                for (final entry in _views.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ListTile(
+                      key: ValueKey('library-view-${entry.key.name}'),
+                      leading: Icon(_viewIcons[entry.key], size: 20),
+                      title: Text(entry.value),
+                      selected: widget.controller.libraryView == entry.key,
+                      onTap: () {
+                        _options(view: entry.key);
+                        if (drawer) Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                if (widget.controller.savedFilters.isNotEmpty) ...[
+                  const Divider(),
+                  for (final filter in widget.controller.savedFilters)
+                    ListTile(
+                      key: ValueKey('saved-filter-${filter.name}'),
+                      leading: const Icon(Icons.bookmark_outline, size: 18),
+                      title: Text(
+                        filter.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () {
+                        _applyFilter(filter);
+                        if (drawer) Navigator.of(context).pop();
+                      },
+                      trailing: IconButton(
+                        tooltip: context.l10n.notesHomeDeleteSavedSearch(
+                          filter.name,
+                        ),
+                        onPressed: () =>
+                            widget.controller.deleteFilter(filter.name),
+                        icon: const Icon(Icons.close, size: 16),
+                      ),
+                    ),
+                ],
+                if (widget.controller.availableTags.isNotEmpty) ...[
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.label_outline, size: 20),
+                    title: Text(context.l10n.notesHomeFilterByTags),
+                    onTap: () {
+                      if (drawer) Navigator.of(context).pop();
+                      _chooseTags();
+                    },
+                  ),
+                  for (final tag in widget.controller.availableTags)
+                    ListTile(
+                      dense: true,
+                      title: Text(
+                        tag,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      selected: widget.controller.selectedTags.contains(tag),
+                      leading: const Icon(Icons.tag, size: 16),
+                      onTap: () {
+                        _options(
+                          tags: widget.controller.selectedTags.contains(tag)
+                              ? []
+                              : [tag],
+                        );
+                        if (drawer) Navigator.of(context).pop();
+                      },
+                    ),
+                ],
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: Text(context.l10n.notesHomeSettings),
+              onTap: () {
+                if (drawer) Navigator.of(context).pop();
+                _openSettings();
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _sortControls() => LayoutBuilder(
+    builder: (context, constraints) => Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: constraints.maxWidth < 440 ? constraints.maxWidth : 240,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<NoteSort>(
+              key: const ValueKey('sort-order'),
+              value: widget.controller.noteSort,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(12),
+              onChanged: (sort) => _options(sort: sort),
+              items: [
+                for (final entry in {
+                  NoteSort.updated: context.l10n.notesHomeRecentlyEdited,
+                  NoteSort.updatedOldest: context.l10n.sortUpdatedOldest,
+                  NoteSort.created: context.l10n.notesHomeNewestCreated,
+                  NoteSort.createdOldest: context.l10n.sortCreatedOldest,
+                  NoteSort.title: context.l10n.notesHomeTitleAZ,
+                  NoteSort.titleDesc: context.l10n.sortTitleDesc,
+                  NoteSort.reminder: context.l10n.sortReminder,
+                  NoteSort.color: context.l10n.sortColor,
+                  NoteSort.length: context.l10n.sortLength,
+                }.entries)
+                  DropdownMenuItem(
+                    value: entry.key,
+                    child: Text(
+                      entry.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        FilterChip(
+          key: const ValueKey('favorites-first'),
+          label: Text(context.l10n.sortFavoritesFirst),
+          selected: widget.controller.favoritesFirst,
+          onSelected: (value) => _options(favoritesFirst: value),
+        ),
+        if (_search.text.isNotEmpty ||
+            widget.controller.selectedTags.isNotEmpty ||
+            widget.controller.noteSort != NoteSort.updated)
+          TextButton(
+            onPressed: () {
+              _search.clear();
+              _options(reset: true);
+            },
+            child: Text(context.l10n.notesHomeResetFilters),
+          ),
+      ],
+    ),
+  );
+
+  Widget _searchField() => TextField(
+    controller: _search,
+    focusNode: _searchFocus,
+    onChanged: (_) => setState(() {}),
+    decoration: InputDecoration(
+      hintText: context.l10n.notesHomeSearchTitlesAndTextIn,
+      prefixIcon: const Icon(Icons.search, size: 20),
+      suffixIcon: _search.text.isEmpty
+          ? null
+          : IconButton(
+              tooltip: context.l10n.notesHomeClearSearch,
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                _search.clear();
+                setState(() {});
+              },
+            ),
+    ),
+  );
+
+  Widget _collectionHeader(bool sidebar) => Padding(
+    padding: const EdgeInsets.only(top: 12, bottom: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  _views[widget.controller.libraryView]!,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: context.l10n.libraryFilters,
+              isSelected: _filtersOpen,
+              onPressed: () => setState(() => _filtersOpen = !_filtersOpen),
+              icon: const Icon(Icons.tune_rounded),
+            ),
+            IconButton(
+              tooltip: widget.controller.compactView
+                  ? context.l10n.notesHomeCardView
+                  : context.l10n.notesHomeCompactListView,
+              onPressed: () =>
+                  _options(compact: !widget.controller.compactView),
+              icon: Icon(
+                widget.controller.compactView
+                    ? Icons.grid_view_outlined
+                    : Icons.view_list_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _searchField(),
+        if (_search.text.isNotEmpty &&
+            widget.controller.libraryView != LibraryView.allActive)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => _options(view: LibraryView.allActive),
+              child: Text(context.l10n.notesHomeSearchAllActiveNotesIncluding),
+            ),
+          ),
+        const SizedBox(height: 8),
+        _sortControls(),
+        NotesSpringPanel(
+          open: _filtersOpen || widget.controller.selectedTags.isNotEmpty,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _chooseTags,
+              icon: const Icon(Icons.label_outline),
+              label: Text(
+                widget.controller.selectedTags.isEmpty
+                    ? context.l10n.notesHomeFilterByTags
+                    : context.l10n.notesHomeTags(
+                        widget.controller.selectedTags.join(', '),
+                      ),
+              ),
+            ),
+          ),
+        ),
+        // Save-search stays near the query; saved searches live in navigation.
+        if (!sidebar) _savedFilters(),
+        if (sidebar &&
+            (_search.text.isNotEmpty ||
+                widget.controller.selectedTags.isNotEmpty ||
+                widget.controller.libraryView != LibraryView.notes ||
+                widget.controller.noteSort != NoteSort.updated))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _saveFilter,
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: Text(context.l10n.notesHomeSaveSearch),
+            ),
+          ),
+        if (widget.controller.autoBackupError != null)
+          _notice(
+            widget.controller.autoBackupError!,
+            Icons.backup_outlined,
+            _openSettings,
+            context.l10n.notesHomeSettings,
+            warning: true,
+          ),
+        if (widget.controller.saveFailure != null)
+          _notice(
+            widget.controller.saveFailure!,
+            Icons.error_outline,
+            () async {
+              try {
+                await widget.controller.flushAllEditors();
+              } catch (error) {
+                widget.controller.reportSaveFailure('Save failed: $error');
+              }
+            },
+            context.l10n.noteRetry,
+          ),
+      ],
+    ),
+  );
+
+  Widget _notice(
+    String message,
+    IconData icon,
+    VoidCallback action,
+    String label, {
+    bool warning = false,
+  }) {
+    final colors = NotesColors.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: ListTile(
+        tileColor: warning ? colors.warningSurface : scheme.errorContainer,
+        textColor: warning ? colors.warning : scheme.onErrorContainer,
+        iconColor: warning ? colors.warning : scheme.onErrorContainer,
+        leading: Icon(icon),
+        title: Text(message),
+        trailing: TextButton(onPressed: action, child: Text(label)),
+      ),
+    );
+  }
+
+  Widget _collectionSliver() => AnimatedBuilder(
+    animation: widget.controller,
+    builder: (context, _) {
+      final query = _search.text.trim().toLowerCase();
+      final notes = widget.controller.librarySearch(query);
+      final showTrash = widget.controller.libraryView == LibraryView.trash;
+      if (notes.isEmpty) {
+        return SliverFillRemaining(
+          hasScrollBody: false,
+          child: EmptyState(
+            searching: query.isNotEmpty,
+            onCreate: _newNote,
+            message: showTrash
+                ? query.isEmpty
+                      ? context.l10n.notesHomeTrashIsEmpty
+                      : context.l10n.notesHomeNoMatchingNotesInTrash
+                : widget.controller.libraryView != LibraryView.notes ||
+                      widget.controller.selectedTags.isNotEmpty
+                ? context.l10n.notesHomeNoNotesMatchThisView
+                : null,
+            onReset:
+                query.isNotEmpty ||
+                    widget.controller.selectedTags.isNotEmpty ||
+                    widget.controller.libraryView != LibraryView.notes
+                ? () {
+                    _search.clear();
+                    _options(reset: true);
+                  }
+                : null,
+          ),
+        );
+      }
+      if (widget.controller.compactView && !showTrash) {
+        return SliverPadding(
+          padding: const EdgeInsets.only(bottom: 100),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  height: notes[index].archivedAt != null
+                      ? 270
+                      : 72 *
+                            MediaQuery.textScalerOf(context)
+                                .scale(1)
+                                .clamp(1, 3),
+                  child: _libraryItem(notes[index], showTrash),
+                ),
+              ),
+              childCount: notes.length,
+            ),
+          ),
+        );
+      }
+      return SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.crossAxisExtent > 760
+              ? 3
+              : constraints.crossAxisExtent > 500
+              ? 2
+              : 1;
+          return SliverPadding(
+            padding: const EdgeInsets.only(bottom: 100),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                mainAxisExtent:
+                    270 +
+                    (MediaQuery.textScalerOf(context).scale(14) / 14 - 1).clamp(
+                          0,
+                          3,
+                        ) *
+                        140,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _libraryItem(notes[index], showTrash),
+                childCount: notes.length,
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
     bindings: {
@@ -593,446 +1009,135 @@ class _NotesHomeState extends State<NotesHome> {
     },
     child: Focus(
       autofocus: true,
-      child: Scaffold(
-        appBar: _selecting
-            ? _selectionBar(context)
-            : AppBar(
-                title: WindowTitle(
-                  child: Text(
-                    context.l10n.windowChromeBetternotes,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                actions: [
-                  AnimatedBuilder(
-                    animation: widget.controller,
-                    builder: (context, _) => IconButton(
-                      tooltip: widget.controller.syncError == null
-                          ? widget.controller.signedIn
-                                ? context.l10n.notesHomeSyncNotes
-                                : context.l10n.notesHomeLocalNotes
-                          : context.l10n.settingsSyncNeedsAttention,
-                      icon: Icon(
-                        widget.controller.syncError != null
-                            ? Icons.cloud_off_outlined
-                            : widget.controller.syncing
-                            ? Icons.sync
-                            : widget.controller.signedIn
-                            ? Icons.cloud_done_outlined
-                            : Icons.cloud_outlined,
-                      ),
-                      onPressed: widget.controller.signedIn
-                          ? widget.controller.sync
-                          : () => _openSettings(),
+      child: AnimatedBuilder(
+        animation: widget.controller,
+        builder: (context, _) => LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1000;
+            final sidebar =
+                constraints.maxWidth >= 720 &&
+                _sidebarOpen &&
+                MediaQuery.textScalerOf(context).scale(1) <= 1.5;
+            return Scaffold(
+              key: _scaffoldKey,
+              drawer: sidebar
+                  ? null
+                  : Drawer(
+                      shape: const RoundedRectangleBorder(),
+                      child: _navigation(drawer: true),
                     ),
-                  ),
-                  PopupMenuButton<NoteTemplate>(
-                    tooltip: context.l10n.notesHomeNewNoteFromTemplate,
-                    icon: const Icon(Icons.note_add_outlined),
-                    enabled: !_creating,
-                    onSelected: _newNote,
-                    itemBuilder: (_) => [
-                      for (final template in noteTemplates)
-                        PopupMenuItem(
-                          value: template,
-                          child: Text(template.name),
+              appBar: _selecting
+                  ? _selectionBar(context)
+                  : AppBar(
+                      leading: IconButton(
+                        tooltip: context.l10n.libraryNavigation,
+                        onPressed: () {
+                          if (sidebar) {
+                            setState(() => _sidebarOpen = false);
+                          } else if (constraints.maxWidth >= 720 &&
+                              MediaQuery.textScalerOf(context).scale(1) <=
+                                  1.5) {
+                            setState(() => _sidebarOpen = true);
+                          } else {
+                            _scaffoldKey.currentState?.openDrawer();
+                          }
+                        },
+                        icon: const Icon(Icons.view_sidebar_outlined),
+                      ),
+                      title: WindowTitle(
+                        child: Text(context.l10n.windowChromeBetternotes),
+                      ),
+                      actions: [
+                        IconButton(
+                          tooltip: widget.controller.syncError != null
+                              ? context.l10n.settingsSyncNeedsAttention
+                              : widget.controller.signedIn
+                              ? context.l10n.notesHomeSyncNotes
+                              : context.l10n.notesHomeLocalNotes,
+                          icon: Icon(
+                            widget.controller.syncError != null
+                                ? Icons.cloud_off_outlined
+                                : widget.controller.syncing
+                                ? Icons.sync
+                                : widget.controller.signedIn
+                                ? Icons.cloud_done_outlined
+                                : Icons.cloud_outlined,
+                          ),
+                          color: widget.controller.syncError != null
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                          onPressed: widget.controller.signedIn
+                              ? widget.controller.sync
+                              : _openSettings,
                         ),
-                    ],
-                  ),
-                  IconButton(
-                    tooltip: context.l10n.notesHomeSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: _openSettings,
-                  ),
-                  const WindowButtons(),
-                  const SizedBox(width: 8),
-                ],
-              ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _creating ? null : _newNote,
-          icon: _creating
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add),
-          label: Text(context.l10n.noteDesktopHeaderNewNote),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1050),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: CustomScrollView(
-                  controller: _libraryScroll,
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 12),
-                          AnimatedBuilder(
-                            animation: widget.controller,
-                            builder: (context, _) => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [
-                                      for (final entry in {
-                                        LibraryView.notes:
-                                            context.l10n.viewNotes,
-                                        LibraryView.favorites:
-                                            context.l10n.viewFavorites,
-                                        LibraryView.reminders:
-                                            context.l10n.viewReminders,
-                                        LibraryView.archive:
-                                            context.l10n.viewArchive,
-                                        LibraryView.trash:
-                                            context.l10n.viewTrash,
-                                        LibraryView.allActive:
-                                            context.l10n.notesHomeAllActive,
-                                      }.entries)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 8,
-                                          ),
-                                          child: ChoiceChip(
-                                            label: Text(entry.value),
-                                            selected:
-                                                widget.controller.libraryView ==
-                                                entry.key,
-                                            onSelected: (_) =>
-                                                _options(view: entry.key),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                LayoutBuilder(
-                                  builder: (context, constraints) => Wrap(
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width:
-                                            constraints.maxWidth < 400 ||
-                                                MediaQuery.textScalerOf(context)
-                                                        .scale(14) >
-                                                    20
-                                            ? constraints.maxWidth
-                                            : constraints.maxWidth - 148,
-                                        child: DropdownButton<NoteSort>(
-                                          key: const ValueKey('sort-order'),
-                                          value: widget.controller.noteSort,
-                                          isExpanded: true,
-                                          onChanged: (sort) =>
-                                              _options(sort: sort),
-                                          items: [
-                                            for (final entry in {
-                                              NoteSort.updated: context
-                                                  .l10n
-                                                  .notesHomeRecentlyEdited,
-                                              NoteSort.updatedOldest: context
-                                                  .l10n
-                                                  .sortUpdatedOldest,
-                                              NoteSort.created: context
-                                                  .l10n
-                                                  .notesHomeNewestCreated,
-                                              NoteSort.createdOldest: context
-                                                  .l10n
-                                                  .sortCreatedOldest,
-                                              NoteSort.title:
-                                                  context.l10n.notesHomeTitleAZ,
-                                              NoteSort.titleDesc:
-                                                  context.l10n.sortTitleDesc,
-                                              NoteSort.reminder:
-                                                  context.l10n.sortReminder,
-                                              NoteSort.color:
-                                                  context.l10n.sortColor,
-                                              NoteSort.length:
-                                                  context.l10n.sortLength,
-                                            }.entries)
-                                              DropdownMenuItem(
-                                                value: entry.key,
-                                                child: Text(
-                                                  entry.value,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      FilterChip(
-                                        key: const ValueKey('favorites-first'),
-                                        label: Text(
-                                          context.l10n.sortFavoritesFirst,
-                                        ),
-                                        selected:
-                                            widget.controller.favoritesFirst,
-                                        onSelected: (value) =>
-                                            _options(favoritesFirst: value),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          _search.clear();
-                                          _options(reset: true);
-                                        },
-                                        child: Text(
-                                          context.l10n.notesHomeResetFilters,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        tooltip: widget.controller.compactView
-                                            ? context.l10n.notesHomeCardView
-                                            : context
-                                                  .l10n
-                                                  .notesHomeCompactListView,
-                                        icon: Icon(
-                                          widget.controller.compactView
-                                              ? Icons.grid_view_outlined
-                                              : Icons.view_list_outlined,
-                                        ),
-                                        onPressed: () => _options(
-                                          compact:
-                                              !widget.controller.compactView,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                _savedFilters(),
-                                if (widget
-                                        .controller
-                                        .availableTags
-                                        .isNotEmpty ||
-                                    widget.controller.selectedTags.isNotEmpty)
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: TextButton.icon(
-                                      onPressed: _chooseTags,
-                                      icon: const Icon(Icons.label_outline),
-                                      label: Text(
-                                        widget.controller.selectedTags.isEmpty
-                                            ? context.l10n.notesHomeFilterByTags
-                                            : context.l10n.notesHomeTags(
-                                                widget.controller.selectedTags
-                                                    .join(', '),
-                                              ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                        if (constraints.maxWidth >= 480) ...[
+                          FilledButton.icon(
+                            onPressed: _creating ? null : _newNote,
+                            icon: const Icon(Icons.edit_square, size: 18),
+                            label: Text(context.l10n.noteDesktopHeaderNewNote),
                           ),
-                          AnimatedBuilder(
-                            animation: widget.controller,
-                            builder: (context, _) =>
-                                widget.controller.autoBackupError == null
-                                ? const SizedBox.shrink()
-                                : Semantics(
-                                    liveRegion: true,
-                                    child: ListTile(
-                                      leading: const Icon(
-                                        Icons.backup_outlined,
-                                      ),
-                                      title: Text(
-                                        widget.controller.autoBackupError!,
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      trailing: TextButton(
-                                        onPressed: _openSettings,
-                                        child: Text(
-                                          context.l10n.notesHomeSettings,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                          const SizedBox(width: 4),
+                        ] else
+                          IconButton(
+                            tooltip: context.l10n.noteDesktopHeaderNewNote,
+                            onPressed: _creating ? null : _newNote,
+                            icon: const Icon(Icons.edit_square),
                           ),
-                          AnimatedBuilder(
-                            animation: widget.controller,
-                            builder: (context, _) =>
-                                widget.controller.saveFailure == null
-                                ? const SizedBox.shrink()
-                                : Semantics(
-                                    liveRegion: true,
-                                    child: ListTile(
-                                      leading: const Icon(Icons.error_outline),
-                                      title: Text(
-                                        widget.controller.saveFailure!,
-                                      ),
-                                      trailing: TextButton(
-                                        onPressed: () async {
-                                          try {
-                                            await widget.controller
-                                                .flushAllEditors();
-                                          } catch (error) {
-                                            widget.controller.reportSaveFailure(
-                                              'Save failed: $error',
-                                            );
-                                          }
-                                        },
-                                        child: Text(context.l10n.noteRetry),
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _search,
-                            focusNode: _searchFocus,
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              hintText:
-                                  context.l10n.notesHomeSearchTitlesAndTextIn,
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: _search.text.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      tooltip:
-                                          context.l10n.notesHomeClearSearch,
-                                      icon: const Icon(Icons.close),
-                                      onPressed: () {
-                                        _search.clear();
-                                        setState(() {});
-                                      },
-                                    ),
-                            ),
-                          ),
-                          if (_search.text.isNotEmpty &&
-                              widget.controller.libraryView !=
-                                  LibraryView.allActive)
-                            TextButton(
-                              onPressed: () =>
-                                  _options(view: LibraryView.allActive),
-                              child: Text(
-                                context
-                                    .l10n
-                                    .notesHomeSearchAllActiveNotesIncluding,
+                        PopupMenuButton<NoteTemplate>(
+                          tooltip: context.l10n.notesHomeNewNoteFromTemplate,
+                          icon: const Icon(Icons.expand_more),
+                          enabled: !_creating,
+                          onSelected: _newNote,
+                          itemBuilder: (_) => [
+                            for (final template in noteTemplates)
+                              PopupMenuItem(
+                                value: template,
+                                child: Text(template.name),
                               ),
-                            ),
-                          const SizedBox(height: 18),
-                        ],
-                      ),
+                          ],
+                        ),
+                        if (!sidebar)
+                          IconButton(
+                            tooltip: context.l10n.notesHomeSettings,
+                            onPressed: _openSettings,
+                            icon: const Icon(Icons.settings_outlined),
+                          ),
+                        const WindowButtons(),
+                        const SizedBox(width: 8),
+                      ],
                     ),
-                    AnimatedBuilder(
-                      animation: widget.controller,
-                      builder: (context, _) {
-                        final query = _search.text.trim().toLowerCase();
-                        final notes = widget.controller.librarySearch(query);
-                        final showTrash =
-                            widget.controller.libraryView == LibraryView.trash;
-                        if (notes.isEmpty) {
-                          return SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: EmptyState(
-                              searching: query.isNotEmpty,
-                              onCreate: _newNote,
-                              message: showTrash
-                                  ? query.isEmpty
-                                        ? context.l10n.notesHomeTrashIsEmpty
-                                        : context
-                                              .l10n
-                                              .notesHomeNoMatchingNotesInTrash
-                                  : widget.controller.libraryView !=
-                                            LibraryView.notes ||
-                                        widget
-                                            .controller
-                                            .selectedTags
-                                            .isNotEmpty
-                                  ? context.l10n.notesHomeNoNotesMatchThisView
-                                  : null,
-                              onReset:
-                                  query.isNotEmpty ||
-                                      widget
-                                          .controller
-                                          .selectedTags
-                                          .isNotEmpty ||
-                                      widget.controller.libraryView !=
-                                          LibraryView.notes
-                                  ? () {
-                                      _search.clear();
-                                      _options(reset: true);
-                                    }
-                                  : null,
+              body: SafeArea(
+                child: Row(
+                  children: [
+                    if (sidebar) ...[
+                      SizedBox(width: wide ? 248 : 216, child: _navigation()),
+                      VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ],
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: wide ? 24 : 16,
+                        ),
+                        child: CustomScrollView(
+                          controller: _libraryScroll,
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: _collectionHeader(sidebar),
                             ),
-                          );
-                        }
-                        if (widget.controller.compactView && !showTrash) {
-                          return SliverPadding(
-                            padding: const EdgeInsets.only(bottom: 100),
-                            sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: SizedBox(
-                                    height: notes[index].archivedAt != null
-                                        ? 270
-                                        : 72 *
-                                              MediaQuery.textScalerOf(context)
-                                                  .scale(1)
-                                                  .clamp(1, 3),
-                                    child: _libraryItem(
-                                      notes[index],
-                                      showTrash,
-                                    ),
-                                  ),
-                                ),
-                                childCount: notes.length,
-                              ),
-                            ),
-                          );
-                        }
-                        return SliverLayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns = constraints.crossAxisExtent > 760
-                                ? 3
-                                : constraints.crossAxisExtent > 500
-                                ? 2
-                                : 1;
-                            return SliverPadding(
-                              padding: const EdgeInsets.only(bottom: 100),
-                              sliver: SliverGrid(
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: columns,
-                                      mainAxisSpacing: 14,
-                                      crossAxisSpacing: 14,
-                                      mainAxisExtent:
-                                          270 +
-                                          (MediaQuery.textScalerOf(context)
-                                                              .scale(14) /
-                                                          14 -
-                                                      1)
-                                                  .clamp(0, 3) *
-                                              140,
-                                    ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) =>
-                                      _libraryItem(notes[index], showTrash),
-                                  childCount: notes.length,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                            _collectionSliver(),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     ),

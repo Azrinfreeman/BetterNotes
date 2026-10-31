@@ -14,7 +14,7 @@ class NoteImageEmbedBuilder extends quill.EmbedBuilder {
 
   final NoteEditorStore store;
   final String noteId;
-  final void Function(int) onRemove;
+  final void Function(int)? onRemove;
 
   @override
   String get key => quill.BlockEmbed.imageType;
@@ -26,7 +26,9 @@ class NoteImageEmbedBuilder extends quill.EmbedBuilder {
         noteId: noteId,
         imageId: embedContext.node.value.data as String,
         inline: true,
-        onRemove: () => onRemove(embedContext.node.documentOffset),
+        onRemove: onRemove == null
+            ? null
+            : () => onRemove!(embedContext.node.documentOffset),
       );
 }
 
@@ -43,7 +45,7 @@ class NoteImageCard extends StatelessWidget {
   final NoteEditorStore controller;
   final String noteId;
   final String imageId;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
   final bool inline;
 
   @override
@@ -89,15 +91,16 @@ class NoteImageCard extends StatelessWidget {
                   ),
                 ),
         ),
-        Positioned(
-          right: 5,
-          top: 5,
-          child: IconButton.filledTonal(
-            tooltip: context.l10n.noteImageEmbedRemoveImage,
-            icon: const Icon(Icons.close),
-            onPressed: onRemove,
+        if (onRemove != null)
+          Positioned(
+            right: 5,
+            top: 5,
+            child: IconButton.filledTonal(
+              tooltip: context.l10n.noteImageEmbedRemoveImage,
+              icon: const Icon(Icons.close),
+              onPressed: onRemove,
+            ),
           ),
-        ),
       ],
     ),
   );

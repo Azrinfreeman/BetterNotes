@@ -5,6 +5,8 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/l10n.dart';
 import '../data/note.dart';
+import 'theme/notes_theme.dart';
+import 'theme/notes_chrome.dart';
 
 /// Auto-hiding colored header for Windows note windows. Visibility and hover
 /// state stay with the page; this widget only draws and reports interactions.
@@ -60,16 +62,19 @@ class NoteDesktopHeader extends StatelessWidget implements PreferredSizeWidget {
             : const Duration(milliseconds: 180),
         child: IgnorePointer(
           ignoring: !visible,
-          child: Material(
-            color: Color(noteColors[note.colorIndex % noteColors.length]),
+          child: NotesChrome(
+            color: noteSurface(context, note.colorIndex, chrome: true),
             child: IconButtonTheme(
               data: IconButtonThemeData(
                 style: IconButton.styleFrom(
-                  foregroundColor: const Color(0xFF2E2631),
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               child: IconTheme(
-                data: const IconThemeData(color: Color(0xFF2E2631)),
+                data: IconThemeData(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  size: 20,
+                ),
                 child: SizedBox(
                   height: 48,
                   child: Row(
@@ -94,7 +99,20 @@ class NoteDesktopHeader extends StatelessWidget implements PreferredSizeWidget {
                           },
                           child: Semantics(
                             label: note.displayTitle,
-                            child: const SizedBox.expand(),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  note.displayTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),

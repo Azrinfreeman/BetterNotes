@@ -83,7 +83,12 @@ void main() {
     expect(controller.notes, hasLength(1));
     expect(
       tester
-          .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+          .widget<FilledButton>(
+            find.ancestor(
+              of: find.text('New note'),
+              matching: find.byType(FilledButton),
+            ),
+          )
           .onPressed,
       isNull,
     );

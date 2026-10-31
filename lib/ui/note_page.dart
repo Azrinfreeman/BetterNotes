@@ -1,3 +1,6 @@
+import 'theme/notes_theme.dart';
+import 'theme/notes_chrome.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -16,6 +19,7 @@ import '../data/clipboard_image.dart';
 import '../data/backup_files.dart' show saveBackupFile;
 import '../data/markdown_export.dart';
 import '../data/note.dart';
+import '../data/text_cleanup.dart';
 import '../data/pdf_export.dart';
 import '../state/note_editor_store.dart';
 import 'drawing_page.dart';
@@ -29,6 +33,7 @@ import 'shortcuts_help.dart';
 import 'version_history.dart';
 import 'text_color_dialog.dart';
 import 'text_style_panel.dart';
+import 'text_cleanup_dialog.dart';
 
 class NotePage extends StatefulWidget {
   const NotePage({
@@ -262,7 +267,53 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _cleanUpText() async {
+    if (_closing || _editor.readOnly) return;
+    final snapshot = _editor.document.toDelta();
+    final selected = _editor.selection;
+    final encoded = jsonEncode(snapshot.toJson());
+    final stored = jsonEncode(widget.controller.noteById(widget.noteId)?.delta);
+    bool isCurrent() {
+      if (!mounted || _closing || _editor.readOnly) return false;
+      final note = widget.controller.noteById(widget.noteId);
+      final saved = jsonEncode(note?.delta);
+      return note != null &&
+          !note.deleted &&
+          note.archivedAt == null &&
+          (saved == stored || saved == encoded) &&
+          _editor.selection == selected &&
+          jsonEncode(_editor.document.toDelta().toJson()) == encoded;
+    }
+
+    final result = await showDialog<TextCleanupResult>(
+      context: context,
+      builder: (context) => TextCleanupDialog(
+        snapshot: snapshot,
+        selection: selected,
+        liveController: _editor,
+        changes: widget.controller,
+        isCurrent: isCurrent,
+        embedBuilders: [
+          NoteImageEmbedBuilder(
+            store: widget.controller,
+            noteId: widget.noteId,
+            onRemove: null,
+          ),
+        ],
+      ),
+    );
+    if (!mounted || _closing) return;
+    if (result != null && isCurrent()) {
+      _editor.applyCleanup(result.change, result.selection);
+    }
+    _editorFocus.requestFocus();
+  }
+
   Future<void> _organizationAction(String value, Note note) async {
+    if (value == 'cleanup') {
+      await _cleanUpText();
+      return;
+    }
     if (value == 'help') {
       await showShortcutsHelp(context);
       return;
@@ -372,6 +423,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
       child: Text(context.l10n.noteExportAsPdfToPrint),
     ),
     PopupMenuItem(value: 'archive', child: Text(context.l10n.noteArchiveNote)),
+    PopupMenuItem(value: 'cleanup', child: Text(context.l10n.cleanupAction)),
     PopupMenuItem(value: 'find', child: Text(context.l10n.noteFindInNoteCtrlH)),
     PopupMenuItem(
       value: 'help',
@@ -871,7 +923,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
     builder: (context, _) {
       final note = widget.controller.noteById(widget.noteId);
       if (note == null) return const SizedBox.shrink();
-      final noteColor = Color(noteColors[note.colorIndex % noteColors.length]);
+      final noteColor = noteSurface(context, note.colorIndex, chrome: true);
       final saveStatus = _saveError != null
           ? context.l10n.noteSaveFailed
           : _saving != null || _observedDocument != _savedDocument
@@ -892,6 +944,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
           child: Focus(
             autofocus: true,
             child: Scaffold(
+              backgroundColor: Theme.of(context).colorScheme.surface,
               appBar: _desktopNote
                   ? NoteDesktopHeader(
                       note: note,
@@ -977,7 +1030,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                       ],
                       bottom: PreferredSize(
                         preferredSize: const Size.fromHeight(5),
-                        child: Container(height: 5, color: noteColor),
+                        child: Container(height: 1, color: noteColor),
                       ),
                     ),
               body: Listener(
@@ -1097,6 +1150,17 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                                     buttonItems: [
                                                       ...state
                                                           .contextMenuButtonItems,
+                                                      ContextMenuButtonItem(
+                                                        label: context
+                                                            .l10n
+                                                            .notePastePlain,
+                                                        onPressed: () {
+                                                          state.hideToolbar();
+                                                          unawaited(
+                                                            _pastePlainText(),
+                                                          );
+                                                        },
+                                                      ),
                                                       if (!_editor
                                                           .selection
                                                           .isCollapsed)
@@ -1163,10 +1227,7 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                          Material(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainer,
+                          NotesChrome(
                             child: Column(
                               children: [
                                 if (_saveError != null)
@@ -1212,11 +1273,13 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
                                     multiRowsDisplay: true,
                                   ),
                                 ),
-                                if (_showTextStyle)
-                                  TextStylePanel(
+                                NotesSpringPanel(
+                                  open: _showTextStyle,
+                                  child: TextStylePanel(
                                     editor: _editor,
                                     onChooseColor: _chooseTextColor,
                                   ),
+                                ),
                                 Row(
                                   children: [
                                     IconButton(
@@ -1337,6 +1400,10 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
           child: Text(context.l10n.noteCopy),
         ),
         PopupMenuItem(value: 'paste', child: Text(context.l10n.notePaste)),
+        PopupMenuItem(
+          value: 'paste_plain',
+          child: Text(context.l10n.notePastePlain),
+        ),
         PopupMenuItem(value: 'all', child: Text(context.l10n.noteSelectAll)),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -1364,6 +1431,8 @@ class _NotePageState extends State<NotePage> with WidgetsBindingObserver {
         case 'paste':
           // ignore: experimental_member_use
           await _editor.clipboardPaste();
+        case 'paste_plain':
+          await _pastePlainText();
         case 'all':
           _editor.updateSelection(
             TextSelection(

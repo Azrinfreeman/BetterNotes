@@ -231,6 +231,7 @@
   "noteCut": "Cut",
   "noteCopy": "Copy",
   "notePaste": "Paste",
+  "notePastePlain": "Paste as plain text",
   "noteSelectAll": "Select all",
   "noteHighlightColor": "Highlight color",
   "noteUndo": "Undo",
@@ -916,11 +917,41 @@
   "sortColor": "Color",
   "sortLength": "Longest first",
   "sortFavoritesFirst": "Favorites first",
+  "libraryNavigation": "Browse notes",
+  "libraryFilters": "Filters",
+  "settingsReduceTransparency": "Reduce transparency",
+  "settingsAccountSection": "Account & sync",
+  "settingsEditingSection": "Editing",
+  "settingsStorageSection": "Storage & pictures",
+  "settingsWindowsSection": "Windows",
+  "settingsBackupSection": "Backups & export",
+  "settingsHelpSection": "Help & about",
   "cardCreated": "Created {time}",
   "@cardCreated": {
     "placeholders": {
       "time": {
         "type": "String"
+      }
+    }
+  },
+  "cleanupAction": "Clean up text\u2026",
+  "cleanupSelection": "Clean up selection",
+  "cleanupNote": "Clean up note",
+  "cleanupTrailing": "Remove trailing spaces",
+  "cleanupBlank": "Reduce excess blank lines",
+  "cleanupRepeated": "Reduce repeated spaces between words",
+  "cleanupApply": "Apply cleanup",
+  "cleanupCancel": "Cancel",
+  "cleanupNone": "No cleanup needed",
+  "cleanupStale": "The note changed. Close this preview and try again.",
+  "cleanupCounts": "{spaces} spaces and {lines} blank lines removed",
+  "@cleanupCounts": {
+    "placeholders": {
+      "spaces": {
+        "type": "int"
+      },
+      "lines": {
+        "type": "int"
       }
     }
   }

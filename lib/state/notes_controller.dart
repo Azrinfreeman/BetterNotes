@@ -340,6 +340,8 @@ class NotesController extends NoteEditorStore {
   @override
   bool customWindowButtons = false;
   @override
+  bool reduceTransparency = true;
+  @override
   bool inlineImages = false;
   Set<String> stickyImported = {};
   @override
@@ -397,6 +399,8 @@ class NotesController extends NoteEditorStore {
     confirmDelete = await store.getSetting<bool>('confirmDelete') ?? true;
     customWindowButtons =
         await store.getSetting<bool>('customWindowButtons') ?? false;
+    reduceTransparency =
+        await store.getSetting<bool>('reduceTransparency') ?? true;
     inlineImages = await store.getSetting<bool>('inlineImages') ?? false;
     stickyImported = {
       ...?(await store.getSetting<List>('stickyImported'))?.whereType<String>(),
@@ -797,6 +801,12 @@ class NotesController extends NoteEditorStore {
   Future<void> setTheme(ThemeMode value) async {
     themeMode = value;
     await store.setSetting('theme', value.name);
+    notifyListeners();
+  }
+
+  Future<void> setReduceTransparency(bool value) async {
+    await store.setSetting('reduceTransparency', value);
+    reduceTransparency = value;
     notifyListeners();
   }
 
@@ -1267,6 +1277,8 @@ class NotesController extends NoteEditorStore {
           themeMode = ThemeMode.values.byName(theme);
         }
         confirmDelete = prefs['confirmDelete'] as bool? ?? confirmDelete;
+        reduceTransparency =
+            prefs['reduceTransparency'] as bool? ?? reduceTransparency;
         inlineImages = prefs['inlineImages'] as bool? ?? inlineImages;
         customWindowButtons =
             prefs['customWindowButtons'] as bool? ?? customWindowButtons;

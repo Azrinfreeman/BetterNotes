@@ -2,6 +2,7 @@
 // Uses an in-memory notebook; never opens the user's library.
 import 'dart:io';
 
+import 'package:better_notes/data/html_paste.dart';
 import 'package:better_notes/data/local_store.dart';
 import 'package:better_notes/state/notes_controller.dart';
 import 'package:better_notes/ui/note_page.dart';
@@ -15,6 +16,8 @@ import 'package:window_manager/window_manager.dart';
 void check(bool condition, String label) {
   if (!condition) throw StateError(label);
   stdout.writeln('PASS: $label');
+  File('${Directory.systemTemp.path}/smoke.log')
+      .writeAsStringSync('PASS: $label\n', mode: FileMode.append);
 }
 
 Future<void> main() async {
@@ -78,6 +81,27 @@ Future<void> main() async {
               'Bright idea',
       'Cut saves text to Windows before removing it',
     );
+    // Another program's HTML (written in Windows "HTML Format") pastes formatted.
+    await const MethodChannel('betternotes/clipboard').invokeMethod('write', {
+      'text': 'Plain Bold',
+      'data': '{}',
+      'html': clipboardHtml('<p>Plain <b>Bold</b></p>'),
+    });
+    final web = NoteQuillController(
+      noteId: 'native-web',
+      document: quill.Document(),
+      selection: const TextSelection.collapsed(offset: 0),
+      config: const quill.QuillControllerConfig(),
+      onClipboardError: errors.add,
+    );
+    check(await web.pasteCopiedText(), 'HTML from another program is pasted');
+    check(
+      web.document.toPlainText() == 'Plain Bold\n' &&
+          web.document.collectStyle(6, 4).attributes['bold']?.value == true &&
+          web.document.collectStyle(0, 5).attributes['bold'] == null,
+      'HTML paste keeps bold and leaves other text plain',
+    );
+    web.dispose();
     target.dispose();
 
     final db = await databaseFactoryMemory.openDatabase('native-resize');
@@ -115,6 +139,8 @@ Future<void> main() async {
       'native window resizing grows the editor in both dimensions',
     );
     stdout.writeln('NATIVE_CLIPBOARD_RESIZE_OK');
+    File('${Directory.systemTemp.path}/smoke.log')
+        .writeAsStringSync('OK\n', mode: FileMode.append);
     await stdout.flush();
     exit(0);
   } catch (error, stack) {

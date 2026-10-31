@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../data/note.dart';
 import '../l10n/l10n.dart';
+import 'theme/notes_theme.dart';
 import '../state/note_editor_store.dart';
 import '../state/notes_controller.dart';
 import 'note_page.dart';
@@ -244,7 +245,7 @@ class CompactNoteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(noteColors[note.colorIndex % noteColors.length]);
+    final color = noteSurface(context, note.colorIndex);
     final scheme = Theme.of(context).colorScheme;
     final snippet = note.title.trim().isEmpty
         ? note.plainText.trimLeft().split('\n').skip(1).join(' ').trim()
@@ -266,12 +267,11 @@ class CompactNoteTile extends StatelessWidget {
       child: Card(
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
-        color: selected ? scheme.primaryContainer : null,
+        color: selected ? scheme.primaryContainer : color,
         child: InkWell(
           onTap: onOpen,
           child: Row(
             children: [
-              Container(width: 8, color: color),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -330,8 +330,7 @@ class NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(noteColors[note.colorIndex % noteColors.length]);
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final color = noteSurface(context, note.colorIndex);
     final preview = note.title.trim().isEmpty
         ? note.plainText.trimLeft().split('\n').skip(1).join('\n')
         : note.plainText;
@@ -345,7 +344,7 @@ class NoteCard extends StatelessWidget {
       ),
       child: Card(
         clipBehavior: Clip.antiAlias,
-        color: dark ? Theme.of(context).colorScheme.surfaceContainerHigh : null,
+        color: color,
         child: InkWell(
           onTap:
               onOpen ??
@@ -358,15 +357,16 @@ class NoteCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(height: 7, color: color),
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 12, 12, 6),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        noteDateLabel(note, sort),
-                        style: Theme.of(context).textTheme.labelMedium,
+                        note.displayTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
                     PopupMenuButton<int>(
@@ -469,11 +469,15 @@ class NoteCard extends StatelessWidget {
                             child: Row(
                               children: [
                                 CircleAvatar(
-                                  radius: 10,
+                                  radius: 8,
                                   backgroundColor: Color(noteColors[i]),
                                 ),
                                 const SizedBox(width: 10),
                                 Text(noteColorNames[i]),
+                                if (note.colorIndex == i) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.check, size: 18),
+                                ],
                               ],
                             ),
                           ),
@@ -502,10 +506,10 @@ class NoteCard extends StatelessWidget {
                       ),
                     Expanded(
                       child: Text(
-                        note.displayTitle,
+                        noteDateLabel(note, sort),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ),
                   ],

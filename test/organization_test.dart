@@ -481,6 +481,8 @@ void main() {
         ' Work, IDEAS, work ',
       );
       await tester.tap(find.text('Save'));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 250));
       await tester.pumpAndSettle();
       expect(controller.noteById(note.id)!.title, 'Project plan');
       expect(controller.noteById(note.id)!.tags, ['ideas', 'work']);
@@ -502,6 +504,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.archiveNotes.single.plainText, 'Final draft');
       expect(find.byType(quill.QuillEditor), findsNothing);
+      await tester.tap(find.byTooltip('Browse notes'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Archive'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Archive'));
@@ -513,12 +517,29 @@ void main() {
       await tester.tap(find.text('Restore from Archive'));
       await tester.pumpAndSettle();
       expect(controller.archiveNotes, isEmpty);
+      await tester.tap(find.byTooltip('Browse notes'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Notes'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Notes'));
       await tester.pumpAndSettle();
       expect(find.text('Project plan'), findsOneWidget);
-      await tester.tap(find.text('Filter by tags'));
+      await tester.tap(find.byTooltip('Browse notes'));
+      await tester.pumpAndSettle();
+      final drawer = find.byType(Drawer);
+      final filterTags = find.descendant(
+        of: drawer,
+        matching: find.text('Filter by tags'),
+      );
+      await tester.scrollUntilVisible(
+        filterTags,
+        200,
+        scrollable: find.descendant(
+          of: drawer,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(filterTags);
       await tester.pumpAndSettle();
       await tester.tap(find.text('ideas'));
       await tester.tap(find.text('work'));

@@ -1,0 +1,22 @@
+{
+  "name": "betternotes-trailer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "remotion studio src/index.ts --port=3000",
+    "render": "remotion render src/index.ts BetterNotes out/BetterNotes-Trailer-60s.mp4 --codec=h264 --crf=17",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.484",
+    "@remotion/media": "4.0.484",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remotion": "4.0.484"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "playwright": "1.64.1",
+    "typescript": "6.0.3"
+  }
+}
