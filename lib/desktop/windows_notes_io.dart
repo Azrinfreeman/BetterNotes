@@ -314,6 +314,7 @@ class DesktopCoordinator with WindowListener {
       'syncing': controller.syncing,
       'theme': controller.themeMode.name,
       'customWindowButtons': controller.customWindowButtons,
+      'reduceTransparency': controller.reduceTransparency,
       'inlineImages': controller.inlineImages,
       'alwaysShowNoteHeader': controller.alwaysShowNoteHeader,
       'availableTags': controller.availableTags,

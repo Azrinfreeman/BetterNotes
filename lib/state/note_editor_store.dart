@@ -28,6 +28,7 @@ abstract class NoteEditorStore extends ChangeNotifier {
   bool get signedIn;
   ThemeMode get themeMode;
   bool get customWindowButtons => false;
+  bool get reduceTransparency => true;
   bool get inlineImages => false;
   bool get alwaysShowNoteHeader => false;
   ImageQuality get imageQuality => ImageQuality.balanced;

@@ -138,6 +138,7 @@ class NoteBackup {
     final preferences = <String, Object>{};
     for (final key in [
       'theme',
+      'reduceTransparency',
       'confirmDelete',
       'inlineImages',
       'customWindowButtons',
@@ -477,6 +478,7 @@ class NoteBackup {
       } else if ([
             'confirmDelete',
             'inlineImages',
+            'reduceTransparency',
             'customWindowButtons',
           ].contains(entry.key) &&
           entry.value is bool) {

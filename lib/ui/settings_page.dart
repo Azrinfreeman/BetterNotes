@@ -18,6 +18,7 @@ import '../state/notes_controller.dart';
 import '../l10n/l10n.dart';
 import 'about_page.dart';
 import 'shortcuts_help.dart';
+import 'settings_sections.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.controller});
@@ -461,230 +462,131 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         actions: const [WindowButtons(), SizedBox(width: 8)],
       ),
-      body: ListView(
-        children: [
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.account_circle_outlined),
-            title: Text(
-              widget.controller.email ?? context.l10n.notesHomeLocalNotes,
-            ),
-            subtitle: Text(
-              widget.controller.cloudAvailable
-                  ? widget.controller.signedIn
-                        ? context.l10n.settingsYourNotesCanSyncAcross
-                        : context.l10n.settingsSignInWithGoogleTo
-                  : context.l10n.settingsGoogleSyncNeedsASupabase,
-            ),
-          ),
-          if (widget.controller.cloudAvailable && !widget.controller.signedIn)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(72, 4, 24, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton(
-                  onPressed: () async {
-                    try {
-                      await signInWithGoogle(widget.controller.client!);
-                    } catch (error) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              context.l10n.settingsSignInFailed('$error'),
-                            ),
-                          ),
-                        );
+      body: SafeArea(
+        child: SettingsSections(
+          sections: [
+            SettingsSection(
+              context.l10n.settingsAccountSection,
+              Icons.person_outline,
+              [
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.account_circle_outlined),
+                  title: Text(
+                    widget.controller.email ?? context.l10n.notesHomeLocalNotes,
+                  ),
+                  subtitle: Text(
+                    widget.controller.cloudAvailable
+                        ? widget.controller.signedIn
+                              ? context.l10n.settingsYourNotesCanSyncAcross
+                              : context.l10n.settingsSignInWithGoogleTo
+                        : context.l10n.settingsGoogleSyncNeedsASupabase,
+                  ),
+                ),
+                if (widget.controller.cloudAvailable &&
+                    !widget.controller.signedIn)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(72, 4, 24, 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton(
+                        onPressed: () async {
+                          try {
+                            await signInWithGoogle(widget.controller.client!);
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    context.l10n.settingsSignInFailed('$error'),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: Text(context.l10n.settingsContinueWithGoogle),
+                      ),
+                    ),
+                  ),
+                if (widget.controller.signedIn)
+                  ListTile(
+                    leading: const Icon(Icons.logout),
+                    title: Text(context.l10n.settingsSignOut),
+                    onTap: () async {
+                      try {
+                        await widget.controller.signOut();
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text('$error')));
+                        }
                       }
-                    }
-                  },
-                  child: Text(context.l10n.settingsContinueWithGoogle),
-                ),
-              ),
-            ),
-          if (widget.controller.signedIn)
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: Text(context.l10n.settingsSignOut),
-              onTap: () async {
-                try {
-                  await widget.controller.signOut();
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(content: Text('$error')));
-                  }
-                }
-              },
-            ),
-          if (widget.controller.syncError != null)
-            ListTile(
-              leading: const Icon(Icons.cloud_off_outlined),
-              title: Text(context.l10n.settingsSyncNeedsAttention),
-              subtitle: Text(widget.controller.syncError!),
-              trailing: TextButton(
-                onPressed: widget.controller.sync,
-                child: Text(context.l10n.noteRetry),
-              ),
-            ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.settingsAppearance),
-                DropdownButton<ThemeMode>(
-                  isExpanded: true,
-                  value: widget.controller.themeMode,
-                  onChanged: (mode) {
-                    if (mode != null) widget.controller.setTheme(mode);
-                  },
-                  items: [
-                    DropdownMenuItem(
-                      value: ThemeMode.system,
-                      child: Text(context.l10n.settingsSystem),
+                    },
+                  ),
+                if (widget.controller.syncError != null)
+                  ListTile(
+                    leading: const Icon(Icons.cloud_off_outlined),
+                    title: Text(context.l10n.settingsSyncNeedsAttention),
+                    subtitle: Text(widget.controller.syncError!),
+                    trailing: TextButton(
+                      onPressed: widget.controller.sync,
+                      child: Text(context.l10n.noteRetry),
                     ),
-                    DropdownMenuItem(
-                      value: ThemeMode.light,
-                      child: Text(context.l10n.settingsLight),
-                    ),
-                    DropdownMenuItem(
-                      value: ThemeMode.dark,
-                      child: Text(context.l10n.settingsDark),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.delete_outline),
-            title: Text(context.l10n.settingsConfirmBeforeDeleting),
-            value: widget.controller.confirmDelete,
-            onChanged: widget.controller.setConfirmDelete,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.settingsEmptyTrashAutomatically),
-                Text(context.l10n.settingsPermanentlyDeletesLocalNotesAfter),
-                DropdownButton<int>(
-                  key: const ValueKey('trash-retention'),
-                  isExpanded: true,
-                  value: widget.controller.trashRetentionDays,
-                  items: [
-                    DropdownMenuItem(
-                      value: 0,
-                      child: Text(context.l10n.settingsNever),
-                    ),
-                    DropdownMenuItem(
-                      value: 7,
-                      child: Text(context.l10n.settingsAfterDays),
-                    ),
-                    DropdownMenuItem(
-                      value: 30,
-                      child: Text(context.l10n.settingsAfterDays2),
-                    ),
-                    DropdownMenuItem(
-                      value: 90,
-                      child: Text(context.l10n.settingsAfterDays3),
-                    ),
-                  ],
-                  onChanged: (days) {
-                    if (days != null) {
-                      widget.controller.setTrashRetentionDays(days);
-                    }
-                  },
+            SettingsSection(
+              context.l10n.settingsAppearance,
+              Icons.contrast_rounded,
+              [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButton<ThemeMode>(
+                        isExpanded: true,
+                        value: widget.controller.themeMode,
+                        onChanged: (mode) {
+                          if (mode != null) widget.controller.setTheme(mode);
+                        },
+                        items: [
+                          DropdownMenuItem(
+                            value: ThemeMode.system,
+                            child: Text(context.l10n.settingsSystem),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.light,
+                            child: Text(context.l10n.settingsLight),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.dark,
+                            child: Text(context.l10n.settingsDark),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.imageQualityTitle),
-                Text(context.l10n.imageQualityHelp),
-                DropdownButton<ImageQuality>(
-                  key: const ValueKey('image-quality'),
-                  isExpanded: true,
-                  value: widget.controller.imageQuality,
-                  onChanged: (value) {
-                    if (value != null) widget.controller.setImageQuality(value);
-                  },
-                  items: [
-                    DropdownMenuItem(
-                      value: ImageQuality.balanced,
-                      child: Text(context.l10n.imageQualityBalanced),
-                    ),
-                    DropdownMenuItem(
-                      value: ImageQuality.smallest,
-                      child: Text(context.l10n.imageQualitySmallest),
-                    ),
-                    DropdownMenuItem(
-                      value: ImageQuality.original,
-                      child: Text(context.l10n.imageQualityOriginal),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (stickyNotesFolder() != null)
-            ListTile(
-              key: const ValueKey('sticky-import'),
-              leading: const Icon(Icons.sticky_note_2_outlined),
-              title: Text(context.l10n.stickyTitle),
-              subtitle: Text(context.l10n.stickySubtitle),
-              onTap: _importStickyNotes,
-            ),
-          ListTile(
-            key: const ValueKey('shrink-images'),
-            leading: const Icon(Icons.compress_outlined),
-            title: Text(context.l10n.shrinkTitle),
-            subtitle: Text(
-              widget.controller.signedIn
-                  ? context.l10n.shrinkSignedIn
-                  : context.l10n.shrinkSubtitle,
-            ),
-            enabled: !widget.controller.signedIn,
-            onTap: widget.controller.signedIn ? null : _shrinkStoredImages,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.settingsImagePlacement),
-                Text(context.l10n.settingsAppliesToNewImagesExisting),
-                DropdownButton<bool>(
-                  key: const ValueKey('image-placement'),
-                  isExpanded: true,
-                  value: widget.controller.inlineImages,
-                  items: [
-                    DropdownMenuItem(
-                      value: false,
-                      child: Text(context.l10n.settingsAboveTextCurrent),
-                    ),
-                    DropdownMenuItem(
-                      value: true,
-                      child: Text(context.l10n.settingsWithinNote),
-                    ),
-                  ],
+
+                SwitchListTile(
+                  key: const ValueKey('reduce-transparency'),
+                  secondary: const Icon(Icons.blur_off_rounded),
+                  title: Text(context.l10n.settingsReduceTransparency),
+                  value: widget.controller.reduceTransparency,
                   onChanged: (value) async {
-                    if (value == null) return;
                     try {
-                      await widget.controller.setInlineImages(value);
+                      await widget.controller.setReduceTransparency(value);
                     } catch (error) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              context.l10n.settingsCouldNotSaveImagePlacement(
+                              context.l10n.settingsCouldNotSaveThisPreference(
                                 '$error',
                               ),
                             ),
@@ -696,286 +598,515 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-          ),
-          if (AutoStart.isSupported) ...[
-            const Divider(),
-            SwitchListTile(
-              secondary: const Icon(Icons.visibility_outlined),
-              title: Text(context.l10n.settingsAlwaysShowNoteHeader),
-              subtitle: Text(
-                context.l10n.settingsKeepNoteActionsVisibleWithout,
-              ),
-              value: widget.controller.alwaysShowNoteHeader,
-              onChanged: (value) async {
-                try {
-                  await widget.controller.setAlwaysShowNoteHeader(value);
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          context.l10n.settingsCouldNotSaveHeaderPreference(
-                            '$error',
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-            SwitchListTile(
-              key: const ValueKey('reminder-task'),
-              secondary: const Icon(Icons.alarm_outlined),
-              title: Text(context.l10n.settingsRemindMeWhenBetternotesIs),
-              subtitle: Text(
-                widget.controller.reminderTaskError ??
-                    context.l10n.settingsAddsAWindowsScheduledTask,
-                style: widget.controller.reminderTaskError == null
-                    ? null
-                    : TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              value: widget.controller.reminderTaskEnabled,
-              onChanged: (value) async {
-                try {
-                  await widget.controller.setReminderTaskEnabled(value);
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          context.l10n.settingsCouldNotUpdateTheScheduled(
-                            '$error',
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-            SwitchListTile(
-              key: const ValueKey('keep-in-tray'),
-              secondary: const Icon(Icons.dock_outlined),
-              title: Text(context.l10n.settingsKeepRunningInTheSystem),
-              subtitle: Text(context.l10n.settingsClosingTheNotesWindowHides),
-              value: widget.controller.keepInTray,
-              onChanged: (value) async {
-                try {
-                  await widget.controller.setKeepInTray(value);
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          context.l10n.settingsCouldNotChangeTrayMode('$error'),
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.l10n.settingsQuickNoteShortcut),
-                  Text(
-                    widget.controller.quickCaptureError ??
-                        context.l10n.settingsAGlobalShortcutThatOpens,
-                    style: widget.controller.quickCaptureError == null
-                        ? null
-                        : TextStyle(color: Theme.of(context).colorScheme.error),
+            SettingsSection(
+              context.l10n.settingsEditingSection,
+              Icons.edit_outlined,
+              [
+                SwitchListTile(
+                  secondary: const Icon(Icons.delete_outline),
+                  title: Text(context.l10n.settingsConfirmBeforeDeleting),
+                  value: widget.controller.confirmDelete,
+                  onChanged: widget.controller.setConfirmDelete,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                  DropdownButton<String>(
-                    key: const ValueKey('quick-capture'),
-                    isExpanded: true,
-                    value: widget.controller.quickCaptureKey,
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      try {
-                        await widget.controller.setQuickCaptureKey(value);
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                error is PlatformException &&
-                                        error.code == 'hotkey_in_use'
-                                    ? context
-                                          .l10n
-                                          .settingsAnotherAppAlreadyUsesThat
-                                    : context.l10n
-                                          .settingsCouldNotSetTheShortcut(
-                                            '$error',
-                                          ),
-                              ),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    items: [
-                      for (final entry in quickCapturePresets.entries)
-                        DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value.label),
-                        ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.l10n.settingsEmptyTrashAutomatically),
+                      Text(
+                        context.l10n.settingsPermanentlyDeletesLocalNotesAfter,
+                      ),
+                      DropdownButton<int>(
+                        key: const ValueKey('trash-retention'),
+                        isExpanded: true,
+                        value: widget.controller.trashRetentionDays,
+                        items: [
+                          DropdownMenuItem(
+                            value: 0,
+                            child: Text(context.l10n.settingsNever),
+                          ),
+                          DropdownMenuItem(
+                            value: 7,
+                            child: Text(context.l10n.settingsAfterDays),
+                          ),
+                          DropdownMenuItem(
+                            value: 30,
+                            child: Text(context.l10n.settingsAfterDays2),
+                          ),
+                          DropdownMenuItem(
+                            value: 90,
+                            child: Text(context.l10n.settingsAfterDays3),
+                          ),
+                        ],
+                        onChanged: (days) {
+                          if (days != null) {
+                            widget.controller.setTrashRetentionDays(days);
+                          }
+                        },
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            SwitchListTile(
-              key: const ValueKey('fast-note-opening'),
-              secondary: const Icon(Icons.bolt_outlined),
-              title: Text(context.l10n.settingsFastNoteOpening),
-              subtitle: Text(context.l10n.settingsKeepOneIdleNoteWindow),
-              value: widget.controller.fastNoteOpening,
-              onChanged: (value) async {
-                try {
-                  await widget.controller.setFastNoteOpening(value);
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          context.l10n.settingsCouldNotSaveThisPreference(
-                            '$error',
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.l10n.settingsImagePlacement),
+                      Text(context.l10n.settingsAppliesToNewImagesExisting),
+                      DropdownButton<bool>(
+                        key: const ValueKey('image-placement'),
+                        isExpanded: true,
+                        value: widget.controller.inlineImages,
+                        items: [
+                          DropdownMenuItem(
+                            value: false,
+                            child: Text(context.l10n.settingsAboveTextCurrent),
                           ),
-                        ),
+                          DropdownMenuItem(
+                            value: true,
+                            child: Text(context.l10n.settingsWithinNote),
+                          ),
+                        ],
+                        onChanged: (value) async {
+                          if (value == null) return;
+                          try {
+                            await widget.controller.setInlineImages(value);
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    context.l10n
+                                        .settingsCouldNotSaveImagePlacement(
+                                          '$error',
+                                        ),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
                       ),
-                    );
-                  }
-                }
-              },
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.l10n.settingsWindowButtons),
-                  Text(context.l10n.settingsAppliesToAllBetternotesWindows),
-                  DropdownButton<bool>(
-                    key: const ValueKey('window-buttons'),
-                    isExpanded: true,
-                    value: widget.controller.customWindowButtons,
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      try {
-                        await widget.controller.setCustomWindowButtons(value);
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                context.l10n.settingsCouldNotSaveWindowButtons(
-                                  '$error',
+            SettingsSection(
+              context.l10n.settingsStorageSection,
+              Icons.photo_outlined,
+              [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.l10n.imageQualityTitle),
+                      Text(context.l10n.imageQualityHelp),
+                      DropdownButton<ImageQuality>(
+                        key: const ValueKey('image-quality'),
+                        isExpanded: true,
+                        value: widget.controller.imageQuality,
+                        onChanged: (value) {
+                          if (value != null) {
+                            widget.controller.setImageQuality(value);
+                          }
+                        },
+                        items: [
+                          DropdownMenuItem(
+                            value: ImageQuality.balanced,
+                            child: Text(context.l10n.imageQualityBalanced),
+                          ),
+                          DropdownMenuItem(
+                            value: ImageQuality.smallest,
+                            child: Text(context.l10n.imageQualitySmallest),
+                          ),
+                          DropdownMenuItem(
+                            value: ImageQuality.original,
+                            child: Text(context.l10n.imageQualityOriginal),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (stickyNotesFolder() != null)
+                  ListTile(
+                    key: const ValueKey('sticky-import'),
+                    leading: const Icon(Icons.sticky_note_2_outlined),
+                    title: Text(context.l10n.stickyTitle),
+                    subtitle: Text(context.l10n.stickySubtitle),
+                    onTap: _importStickyNotes,
+                  ),
+                ListTile(
+                  key: const ValueKey('shrink-images'),
+                  leading: const Icon(Icons.compress_outlined),
+                  title: Text(context.l10n.shrinkTitle),
+                  subtitle: Text(
+                    widget.controller.signedIn
+                        ? context.l10n.shrinkSignedIn
+                        : context.l10n.shrinkSubtitle,
+                  ),
+                  enabled: !widget.controller.signedIn,
+                  onTap: widget.controller.signedIn
+                      ? null
+                      : _shrinkStoredImages,
+                ),
+              ],
+            ),
+            if (AutoStart.isSupported)
+              SettingsSection(
+                context.l10n.settingsWindowsSection,
+                Icons.desktop_windows_outlined,
+                [
+                  if (AutoStart.isSupported) ...[
+                    SwitchListTile(
+                      secondary: const Icon(Icons.visibility_outlined),
+                      title: Text(context.l10n.settingsAlwaysShowNoteHeader),
+                      subtitle: Text(
+                        context.l10n.settingsKeepNoteActionsVisibleWithout,
+                      ),
+                      value: widget.controller.alwaysShowNoteHeader,
+                      onChanged: (value) async {
+                        try {
+                          await widget.controller.setAlwaysShowNoteHeader(
+                            value,
+                          );
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.l10n
+                                      .settingsCouldNotSaveHeaderPreference(
+                                        '$error',
+                                      ),
                                 ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         }
-                      }
-                    },
-                    items: [
-                      DropdownMenuItem(
-                        value: false,
-                        child: Text(context.l10n.settingsWindows),
+                      },
+                    ),
+                    SwitchListTile(
+                      key: const ValueKey('reminder-task'),
+                      secondary: const Icon(Icons.alarm_outlined),
+                      title: Text(
+                        context.l10n.settingsRemindMeWhenBetternotesIs,
                       ),
-                      DropdownMenuItem(
-                        value: true,
-                        child: Text(context.l10n.windowChromeBetternotes),
+                      subtitle: Text(
+                        widget.controller.reminderTaskError ??
+                            context.l10n.settingsAddsAWindowsScheduledTask,
+                        style: widget.controller.reminderTaskError == null
+                            ? null
+                            : TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                       ),
-                    ],
-                  ),
+                      value: widget.controller.reminderTaskEnabled,
+                      onChanged: (value) async {
+                        try {
+                          await widget.controller.setReminderTaskEnabled(value);
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.l10n
+                                      .settingsCouldNotUpdateTheScheduled(
+                                        '$error',
+                                      ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    SwitchListTile(
+                      key: const ValueKey('keep-in-tray'),
+                      secondary: const Icon(Icons.dock_outlined),
+                      title: Text(context.l10n.settingsKeepRunningInTheSystem),
+                      subtitle: Text(
+                        context.l10n.settingsClosingTheNotesWindowHides,
+                      ),
+                      value: widget.controller.keepInTray,
+                      onChanged: (value) async {
+                        try {
+                          await widget.controller.setKeepInTray(value);
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.l10n.settingsCouldNotChangeTrayMode(
+                                    '$error',
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.settingsQuickNoteShortcut),
+                          Text(
+                            widget.controller.quickCaptureError ??
+                                context.l10n.settingsAGlobalShortcutThatOpens,
+                            style: widget.controller.quickCaptureError == null
+                                ? null
+                                : TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                          ),
+                          DropdownButton<String>(
+                            key: const ValueKey('quick-capture'),
+                            isExpanded: true,
+                            value: widget.controller.quickCaptureKey,
+                            onChanged: (value) async {
+                              if (value == null) return;
+                              try {
+                                await widget.controller.setQuickCaptureKey(
+                                  value,
+                                );
+                              } catch (error) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        error is PlatformException &&
+                                                error.code == 'hotkey_in_use'
+                                            ? context
+                                                  .l10n
+                                                  .settingsAnotherAppAlreadyUsesThat
+                                            : context.l10n
+                                                  .settingsCouldNotSetTheShortcut(
+                                                    '$error',
+                                                  ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            items: [
+                              for (final entry in quickCapturePresets.entries)
+                                DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value.label),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SwitchListTile(
+                      key: const ValueKey('fast-note-opening'),
+                      secondary: const Icon(Icons.bolt_outlined),
+                      title: Text(context.l10n.settingsFastNoteOpening),
+                      subtitle: Text(
+                        context.l10n.settingsKeepOneIdleNoteWindow,
+                      ),
+                      value: widget.controller.fastNoteOpening,
+                      onChanged: (value) async {
+                        try {
+                          await widget.controller.setFastNoteOpening(value);
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  context.l10n
+                                      .settingsCouldNotSaveThisPreference(
+                                        '$error',
+                                      ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.settingsWindowButtons),
+                          Text(
+                            context.l10n.settingsAppliesToAllBetternotesWindows,
+                          ),
+                          DropdownButton<bool>(
+                            key: const ValueKey('window-buttons'),
+                            isExpanded: true,
+                            value: widget.controller.customWindowButtons,
+                            onChanged: (value) async {
+                              if (value == null) return;
+                              try {
+                                await widget.controller.setCustomWindowButtons(
+                                  value,
+                                );
+                              } catch (error) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        context.l10n
+                                            .settingsCouldNotSaveWindowButtons(
+                                              '$error',
+                                            ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            items: [
+                              DropdownMenuItem(
+                                value: false,
+                                child: Text(context.l10n.settingsWindows),
+                              ),
+                              DropdownMenuItem(
+                                value: true,
+                                child: Text(
+                                  context.l10n.windowChromeBetternotes,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_autoStartEnabled == null)
+                      ListTile(
+                        leading: const Icon(Icons.power_settings_new_outlined),
+                        title: Text(context.l10n.settingsStartWithWindows),
+                        subtitle: Text(
+                          _loadingAutoStart
+                              ? context
+                                    .l10n
+                                    .settingsCheckingWindowsStartupSetting
+                              : context
+                                    .l10n
+                                    .settingsCouldNotReadWindowsStartup2,
+                        ),
+                        trailing: _loadingAutoStart
+                            ? const CircularProgressIndicator()
+                            : TextButton(
+                                onPressed: _loadAutoStart,
+                                child: Text(context.l10n.noteRetry),
+                              ),
+                      )
+                    else
+                      SwitchListTile(
+                        secondary: const Icon(
+                          Icons.power_settings_new_outlined,
+                        ),
+                        title: Text(context.l10n.settingsStartWithWindows),
+                        subtitle: Text(
+                          context.l10n.settingsOpenBetternotesWhenYouSign,
+                        ),
+                        value: _autoStartEnabled!,
+                        onChanged: _savingAutoStart ? null : _setAutoStart,
+                      ),
+                  ],
                 ],
               ),
-            ),
-            if (_autoStartEnabled == null)
-              ListTile(
-                leading: const Icon(Icons.power_settings_new_outlined),
-                title: Text(context.l10n.settingsStartWithWindows),
-                subtitle: Text(
-                  _loadingAutoStart
-                      ? context.l10n.settingsCheckingWindowsStartupSetting
-                      : context.l10n.settingsCouldNotReadWindowsStartup2,
+            SettingsSection(
+              context.l10n.settingsBackupSection,
+              Icons.backup_outlined,
+              [
+                ListTile(
+                  leading: const Icon(Icons.backup_outlined),
+                  title: Text(context.l10n.settingsBackupAndRestore),
+                  subtitle: Text(
+                    context.l10n.settingsCompleteBackupsIncludeTrashFormatting,
+                  ),
+                  trailing: _workingFiles
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(),
+                        )
+                      : null,
                 ),
-                trailing: _loadingAutoStart
-                    ? const CircularProgressIndicator()
-                    : TextButton(
-                        onPressed: _loadAutoStart,
-                        child: Text(context.l10n.noteRetry),
-                      ),
-              )
-            else
-              SwitchListTile(
-                secondary: const Icon(Icons.power_settings_new_outlined),
-                title: Text(context.l10n.settingsStartWithWindows),
-                subtitle: Text(context.l10n.settingsOpenBetternotesWhenYouSign),
-                value: _autoStartEnabled!,
-                onChanged: _savingAutoStart ? null : _setAutoStart,
-              ),
+                ListTile(
+                  leading: const Icon(Icons.file_download_outlined),
+                  title: Text(context.l10n.settingsExportCompleteBackup),
+                  onTap: _workingFiles
+                      ? null
+                      : () => _fileAction(_exportBackup),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_upload_outlined),
+                  title: Text(context.l10n.settingsImportBackup),
+                  subtitle: backup_files.canImportBackup
+                      ? Text(context.l10n.settingsReviewAndAddCopiesWithout)
+                      : Text(context.l10n.settingsImportIsNotAvailableOn),
+                  enabled: !_workingFiles && backup_files.canImportBackup,
+                  onTap: _workingFiles || !backup_files.canImportBackup
+                      ? null
+                      : () => _fileAction(_importBackup),
+                ),
+                if (auto_backup.canAutoBackup) ..._autoBackupTiles(),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(context.l10n.settingsExportActiveNotesAsText),
+                  subtitle: Text(context.l10n.settingsTextOnlyUseAComplete),
+                  onTap: _workingFiles ? null : () => _fileAction(_exportText),
+                ),
+              ],
+            ),
+            SettingsSection(
+              context.l10n.settingsHelpSection,
+              Icons.help_outline,
+              [
+                ListTile(
+                  leading: const Icon(Icons.keyboard_outlined),
+                  title: Text(context.l10n.settingsKeyboardShortcuts),
+                  subtitle: Text(
+                    context.l10n.settingsEditingSearchAndWindowControls,
+                  ),
+                  onTap: () => showShortcutsHelp(context),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(context.l10n.aboutTitle),
+                  subtitle: Text(
+                    context.l10n.settingsAboutSubtitle(appVersionLabel),
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AboutPage(controller: widget.controller),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.backup_outlined),
-            title: Text(context.l10n.settingsBackupAndRestore),
-            subtitle: Text(
-              context.l10n.settingsCompleteBackupsIncludeTrashFormatting,
-            ),
-            trailing: _workingFiles
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(),
-                  )
-                : null,
-          ),
-          ListTile(
-            leading: const Icon(Icons.file_download_outlined),
-            title: Text(context.l10n.settingsExportCompleteBackup),
-            onTap: _workingFiles ? null : () => _fileAction(_exportBackup),
-          ),
-          ListTile(
-            leading: const Icon(Icons.file_upload_outlined),
-            title: Text(context.l10n.settingsImportBackup),
-            subtitle: backup_files.canImportBackup
-                ? Text(context.l10n.settingsReviewAndAddCopiesWithout)
-                : Text(context.l10n.settingsImportIsNotAvailableOn),
-            enabled: !_workingFiles && backup_files.canImportBackup,
-            onTap: _workingFiles || !backup_files.canImportBackup
-                ? null
-                : () => _fileAction(_importBackup),
-          ),
-          if (auto_backup.canAutoBackup) ..._autoBackupTiles(),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: Text(context.l10n.settingsExportActiveNotesAsText),
-            subtitle: Text(context.l10n.settingsTextOnlyUseAComplete),
-            onTap: _workingFiles ? null : () => _fileAction(_exportText),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.keyboard_outlined),
-            title: Text(context.l10n.settingsKeyboardShortcuts),
-            subtitle: Text(context.l10n.settingsEditingSearchAndWindowControls),
-            onTap: () => showShortcutsHelp(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: Text(context.l10n.aboutTitle),
-            subtitle: Text(context.l10n.settingsAboutSubtitle(appVersionLabel)),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AboutPage(controller: widget.controller),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );

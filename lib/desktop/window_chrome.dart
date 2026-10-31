@@ -163,8 +163,8 @@ class _WindowChromeState extends State<WindowChrome> with WindowListener {
                     child: IconButton.filledTonal(
                       tooltip: context.l10n.windowChromeCloseWindow,
                       style: IconButton.styleFrom(
-                        foregroundColor: colors.onErrorContainer,
-                        backgroundColor: colors.errorContainer,
+                        foregroundColor: colors.onSurface,
+                        backgroundColor: Colors.transparent,
                       ),
                       // The coordinator intercepts close to save notes and bounds.
                       onPressed: windowManager.close,
@@ -260,8 +260,8 @@ class WindowButtons extends StatelessWidget {
         IconButton.filledTonal(
           tooltip: context.l10n.windowChromeCloseWindow,
           style: IconButton.styleFrom(
-            foregroundColor: colors.onErrorContainer,
-            backgroundColor: colors.errorContainer,
+            foregroundColor: colors.onSurface,
+            backgroundColor: Colors.transparent,
           ),
           // The coordinator intercepts close to save notes and bounds.
           onPressed: windowManager.close,

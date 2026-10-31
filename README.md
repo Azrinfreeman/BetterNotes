@@ -24,6 +24,7 @@ A cross-platform notes app built with Flutter, designed as a richer replacement 
 
 - **Desktop sticky notes.** Each note gets its own movable, resizable window on Windows. Windows remember their position, can stay on top, and reopen where you left them.
 - **Rich text editing.** Headings, lists, checklists, quotes, inline code, text and highlight colors, font sizes, links, find-in-note, and full undo/redo.
+- **Text cleanup.** In a note, choose **More actions > Clean up text...** to preview whitespace cleanup for the selection or whole note. Apply changes when ready; Undo restores the original. Lists, code, headings, and images are protected.
 - **Images and ink.** Paste screenshots straight from the clipboard, place images inline, and draw with a mouse, touch, or stylus. Images are compressed automatically.
 - **Organize everything.** Titles, tags, favorites, Archive, Trash with undo, saved searches, templates, bulk actions, and several sort orders.
 - **Reminders.** Local reminders show Windows notifications and offer Snooze. An optional scheduled task delivers them even when the app is closed.

@@ -353,6 +353,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notePaste => 'Paste';
 
   @override
+  String get notePastePlain => 'Paste as plain text';
+
+  @override
   String get noteSelectAll => 'Select all';
 
   @override
@@ -1280,7 +1283,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sortFavoritesFirst => 'Favorites first';
 
   @override
+  String get libraryNavigation => 'Browse notes';
+
+  @override
+  String get libraryFilters => 'Filters';
+
+  @override
+  String get settingsReduceTransparency => 'Reduce transparency';
+
+  @override
+  String get settingsAccountSection => 'Account & sync';
+
+  @override
+  String get settingsEditingSection => 'Editing';
+
+  @override
+  String get settingsStorageSection => 'Storage & pictures';
+
+  @override
+  String get settingsWindowsSection => 'Windows';
+
+  @override
+  String get settingsBackupSection => 'Backups & export';
+
+  @override
+  String get settingsHelpSection => 'Help & about';
+
+  @override
   String cardCreated(String time) {
     return 'Created $time';
+  }
+
+  @override
+  String get cleanupAction => 'Clean up text…';
+
+  @override
+  String get cleanupSelection => 'Clean up selection';
+
+  @override
+  String get cleanupNote => 'Clean up note';
+
+  @override
+  String get cleanupTrailing => 'Remove trailing spaces';
+
+  @override
+  String get cleanupBlank => 'Reduce excess blank lines';
+
+  @override
+  String get cleanupRepeated => 'Reduce repeated spaces between words';
+
+  @override
+  String get cleanupApply => 'Apply cleanup';
+
+  @override
+  String get cleanupCancel => 'Cancel';
+
+  @override
+  String get cleanupNone => 'No cleanup needed';
+
+  @override
+  String get cleanupStale =>
+      'The note changed. Close this preview and try again.';
+
+  @override
+  String cleanupCounts(int spaces, int lines) {
+    return '$spaces spaces and $lines blank lines removed';
   }
 }

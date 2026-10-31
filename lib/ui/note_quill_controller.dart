@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill/quill_delta.dart';
 
+import '../data/html_paste.dart';
+
 /// Shares a single completed copy operation between shortcuts and menus.
 class NoteQuillController extends quill.QuillController {
   NoteQuillController({
@@ -25,6 +27,18 @@ class NoteQuillController extends quill.QuillController {
 
   bool get _windows =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+  /// Quill groups nearby changes by time; isolate cleanup on both sides.
+  void applyCleanup(Delta change, TextSelection mappedSelection) {
+    if (readOnly || change.isEmpty) return;
+    document.history.lastRecorded = 0;
+    try {
+      compose(change, selection, quill.ChangeSource.local);
+      updateSelection(mappedSelection, quill.ChangeSource.local);
+    } finally {
+      document.history.lastRecorded = 0;
+    }
+  }
 
   @override
   bool clipboardSelection(bool copy) {
@@ -59,7 +73,11 @@ class NoteQuillController extends quill.QuillController {
     Future<void> write() async {
       try {
         if (_windows) {
-          await _nativeCall<void>('write', {'text': text, 'data': data});
+          await _nativeCall<void>('write', {
+            'text': text,
+            'data': data,
+            'html': clipboardHtml(deltaToHtml(delta)),
+          });
         } else {
           await Clipboard.setData(ClipboardData(text: text));
           _localCopy = data;
@@ -101,8 +119,46 @@ class NoteQuillController extends quill.QuillController {
     }
   }
 
-  /// Called by the existing paste hook, after image and URL handling.
-  Future<bool> pasteCopiedText() async {
+  /// Called by the existing paste hook, after image and URL handling:
+  /// BetterNotes' own copy first, then HTML from other programs.
+  Future<bool> pasteCopiedText() async =>
+      await _pasteOwnCopy() || await _pasteHtml();
+
+  /// Formatted paste from other programs (Windows "HTML Format").
+  Future<bool> _pasteHtml() async {
+    if (!_windows) return false;
+    await _copying;
+    if (_disposed || readOnly) return false;
+    final selected = selection;
+    if (!selected.isValid) return false;
+    final before = jsonEncode(document.toDelta().toJson());
+    try {
+      final raw = await _nativeCall<String>('read_html');
+      if (raw == null || raw.isEmpty) return false;
+      final fragment = htmlFragmentFromClipboard(raw);
+      final delta = fragment == null ? null : htmlToNoteDelta(fragment);
+      if (delta == null ||
+          _disposed ||
+          selection != selected ||
+          jsonEncode(document.toDelta().toJson()) != before) {
+        return false;
+      }
+      replaceText(selected.start, selected.end - selected.start, delta, null);
+      updateSelection(
+        TextSelection.collapsed(
+          offset:
+              selected.start +
+              delta.toList().fold<int>(0, (length, op) => length + op.length!),
+        ),
+        quill.ChangeSource.local,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _pasteOwnCopy() async {
     await _copying;
     if (_disposed || readOnly) return false;
     final selected = selection;

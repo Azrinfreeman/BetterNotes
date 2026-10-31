@@ -1,0 +1,18 @@
+import {chromium} from 'playwright';
+const browser=await chromium.launch({executablePath:'node_modules/.remotion/chrome-headless-shell/win64/chrome-headless-shell-win64/chrome-headless-shell.exe',headless:true});
+const page=await browser.newPage({viewport:{width:1920,height:1080},deviceScaleFactor:2});
+await page.goto('http://127.0.0.1:8765/?capture=fixes');await page.waitForTimeout(4000);
+await page.locator('flt-semantics-placeholder').evaluateAll(els=>els.forEach(e=>e.click()));
+await page.getByText('New note',{exact:true}).waitFor();
+await page.mouse.dblclick(470,300);await page.getByRole('button',{name:'Close note',exact:true}).waitFor();await page.waitForTimeout(700);
+await page.screenshot({path:'public/screens/writing-before.png'});
+await page.mouse.click(39,234);await page.waitForTimeout(600);
+await page.screenshot({path:'public/screens/writing-checked.png'});
+await page.mouse.click(28,28);await page.waitForTimeout(500);
+await page.mouse.dblclick(470,640);await page.waitForTimeout(600);
+await page.screenshot({path:'public/screens/reading-detail.png'});
+await page.mouse.click(28,28);await page.waitForTimeout(400);
+await page.mouse.click(80,1040);await page.waitForTimeout(500);
+await page.mouse.click(110,320);await page.waitForTimeout(700);
+await page.screenshot({path:'public/screens/backups.png'});
+await browser.close();

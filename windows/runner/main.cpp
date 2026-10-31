@@ -73,7 +73,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const bool quit_requested =
       std::find(command_line_arguments.begin(), command_line_arguments.end(),
                 "--quit") != command_line_arguments.end();
-  HWND existing =
+  const bool ui_review =
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--ui-review") != command_line_arguments.end();
+  // An isolated synthetic notebook can run alongside the real application.
+  HWND existing = ui_review ? nullptr :
       FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"better_notes");
   if (quit_requested) {
     if (existing != nullptr) {
@@ -96,7 +100,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
-  RegisterNewNoteTask();
+  if (!ui_review) RegisterNewNoteTask();
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);

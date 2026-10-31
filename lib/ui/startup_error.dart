@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/l10n.dart';
+import 'theme/notes_theme.dart';
 
 /// Shown instead of a blank window when the local library cannot be opened.
 class StartupErrorApp extends StatefulWidget {
@@ -50,9 +51,12 @@ class _StartupErrorAppState extends State<StartupErrorApp> {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: context.l10n.windowChromeBetternotes,
-    theme: ThemeData(
-      useMaterial3: true,
-      colorSchemeSeed: const Color(0xFF795082),
+    theme: betterNotesTheme(Brightness.light),
+    darkTheme: betterNotesTheme(Brightness.dark),
+    highContrastTheme: betterNotesTheme(Brightness.light, highContrast: true),
+    highContrastDarkTheme: betterNotesTheme(
+      Brightness.dark,
+      highContrast: true,
     ),
     home: Builder(
       builder: (context) => Scaffold(

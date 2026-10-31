@@ -27,6 +27,8 @@ class RemoteNoteEditorStore extends NoteEditorStore {
   @override
   bool customWindowButtons = false;
   @override
+  bool reduceTransparency = true;
+  @override
   bool inlineImages = false;
   @override
   bool alwaysShowNoteHeader = false;
@@ -78,6 +80,7 @@ class RemoteNoteEditorStore extends NoteEditorStore {
     syncing = state['syncing'] as bool? ?? false;
     signedIn = state['signedIn'] as bool? ?? false;
     customWindowButtons = state['customWindowButtons'] as bool? ?? false;
+    reduceTransparency = state['reduceTransparency'] as bool? ?? true;
     inlineImages = state['inlineImages'] as bool? ?? false;
     alwaysShowNoteHeader = state['alwaysShowNoteHeader'] as bool? ?? false;
     imageQuality =

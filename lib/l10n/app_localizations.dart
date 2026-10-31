@@ -691,6 +691,12 @@ abstract class AppLocalizations {
   /// **'Paste'**
   String get notePaste;
 
+  /// No description provided for @notePastePlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste as plain text'**
+  String get notePastePlain;
+
   /// No description provided for @noteSelectAll.
   ///
   /// In en, this message translates to:
@@ -2191,11 +2197,131 @@ abstract class AppLocalizations {
   /// **'Favorites first'**
   String get sortFavoritesFirst;
 
+  /// No description provided for @libraryNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse notes'**
+  String get libraryNavigation;
+
+  /// No description provided for @libraryFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get libraryFilters;
+
+  /// No description provided for @settingsReduceTransparency.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce transparency'**
+  String get settingsReduceTransparency;
+
+  /// No description provided for @settingsAccountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account & sync'**
+  String get settingsAccountSection;
+
+  /// No description provided for @settingsEditingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing'**
+  String get settingsEditingSection;
+
+  /// No description provided for @settingsStorageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & pictures'**
+  String get settingsStorageSection;
+
+  /// No description provided for @settingsWindowsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows'**
+  String get settingsWindowsSection;
+
+  /// No description provided for @settingsBackupSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups & export'**
+  String get settingsBackupSection;
+
+  /// No description provided for @settingsHelpSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & about'**
+  String get settingsHelpSection;
+
   /// No description provided for @cardCreated.
   ///
   /// In en, this message translates to:
   /// **'Created {time}'**
   String cardCreated(String time);
+
+  /// No description provided for @cleanupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up text…'**
+  String get cleanupAction;
+
+  /// No description provided for @cleanupSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up selection'**
+  String get cleanupSelection;
+
+  /// No description provided for @cleanupNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up note'**
+  String get cleanupNote;
+
+  /// No description provided for @cleanupTrailing.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove trailing spaces'**
+  String get cleanupTrailing;
+
+  /// No description provided for @cleanupBlank.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce excess blank lines'**
+  String get cleanupBlank;
+
+  /// No description provided for @cleanupRepeated.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce repeated spaces between words'**
+  String get cleanupRepeated;
+
+  /// No description provided for @cleanupApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply cleanup'**
+  String get cleanupApply;
+
+  /// No description provided for @cleanupCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cleanupCancel;
+
+  /// No description provided for @cleanupNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No cleanup needed'**
+  String get cleanupNone;
+
+  /// No description provided for @cleanupStale.
+  ///
+  /// In en, this message translates to:
+  /// **'The note changed. Close this preview and try again.'**
+  String get cleanupStale;
+
+  /// No description provided for @cleanupCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{spaces} spaces and {lines} blank lines removed'**
+  String cleanupCounts(int spaces, int lines);
 }
 
 class _AppLocalizationsDelegate

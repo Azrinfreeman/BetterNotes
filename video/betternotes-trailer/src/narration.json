@@ -1,0 +1,56 @@
+[
+  {
+    "id": "intro",
+    "from": 0,
+    "duration": 180,
+    "text": "BetterNotes. Rich notes for ideas, plans, and everyday details. Ready offline."
+  },
+  {
+    "id": "design",
+    "from": 180,
+    "duration": 240,
+    "text": "Paper and Graphite keeps things clear: collections on the left, tools above, and space to write."
+  },
+  {
+    "id": "write",
+    "from": 420,
+    "duration": 240,
+    "text": "Open a note. Shape your thoughts with headings, checklists, links, and rich formatting. Your work saves locally."
+  },
+  {
+    "id": "visual",
+    "from": 660,
+    "duration": 210,
+    "text": "Keep the context, too. Add pictures beside your words, or sketch an idea with built-in drawing."
+  },
+  {
+    "id": "search",
+    "from": 870,
+    "duration": 210,
+    "text": "Find it again with search, tags, and favorites. Less hunting means more time for the next step."
+  },
+  {
+    "id": "offline",
+    "from": 1080,
+    "duration": 210,
+    "text": "Write, save locally, and keep working. Optional cloud sync connects your configured account."
+  },
+  {
+    "id": "extras",
+    "from": 1290,
+    "duration": 210,
+    "text": "Set reminders. Preview text cleanup before applying it. Revisit earlier versions."
+  },
+  {
+    "id": "more",
+    "from": 1500,
+    "duration": 180,
+    "text": "Templates, backups, PDF exports, Markdown, Sticky Notes import, and accessible controls."
+  },
+  {
+    "id": "outro",
+    "from": 1680,
+    "duration": 120,
+    "text": "BetterNotes. Make room for your next idea."
+  }
+]

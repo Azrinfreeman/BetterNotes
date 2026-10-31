@@ -7,6 +7,10 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_info.dart';
+
+import 'package:window_manager/window_manager.dart';
+
+import 'ui/review_notebook.dart';
 import 'l10n/l10n.dart';
 import 'data/app_log.dart';
 import 'data/local_store.dart';
@@ -18,6 +22,9 @@ import 'state/notes_controller.dart';
 import 'ui/note_page.dart';
 import 'ui/startup_error.dart';
 import 'ui/notes_home.dart';
+import 'ui/theme/notes_theme.dart';
+import 'ui/theme/notes_chrome.dart';
+export 'ui/theme/notes_theme.dart' show betterNotesTheme;
 import 'desktop/window_chrome.dart';
 
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -25,6 +32,19 @@ const _supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (arguments.contains('--ui-review')) {
+    final controller = await createReviewNotebook();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      await windowManager.ensureInitialized();
+      await windowManager.setTitle('BetterNotes ? UI review');
+      await windowManager.setSize(const Size(1180, 820));
+    }
+    runApp(BetterNotesApp(controller: controller));
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      await windowManager.show();
+    }
+    return;
+  }
   await AppLog.init();
   final previousFlutterError = FlutterError.onError;
   FlutterError.onError = (details) {
@@ -145,10 +165,13 @@ class BetterNotesApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       title: 'BetterNotes',
       debugShowCheckedModeBanner: false,
-      builder: (context, child) => WindowChrome(
-        customButtons: controller.customWindowButtons,
-        showCaption: false,
-        child: child!,
+      builder: (context, child) => NotesEnvironment(
+        reduceTransparency: controller.reduceTransparency,
+        child: WindowChrome(
+          customButtons: controller.customWindowButtons,
+          showCaption: false,
+          child: child!,
+        ),
       ),
       themeMode: controller.themeMode,
       theme: betterNotesTheme(Brightness.light),
@@ -199,10 +222,13 @@ class NoteWindowApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       title: 'BetterNotes',
       debugShowCheckedModeBanner: false,
-      builder: (context, child) => WindowChrome(
-        customButtons: controller.customWindowButtons,
-        showCaption: false,
-        child: child!,
+      builder: (context, child) => NotesEnvironment(
+        reduceTransparency: controller.reduceTransparency,
+        child: WindowChrome(
+          customButtons: controller.customWindowButtons,
+          showCaption: false,
+          child: child!,
+        ),
       ),
       themeMode: controller.themeMode,
       theme: betterNotesTheme(Brightness.light),
@@ -232,49 +258,5 @@ class NoteWindowApp extends StatelessWidget {
               onFindNotes: onFindNotes,
             ),
     ),
-  );
-}
-
-final _themeCache = <(Brightness, bool), ThemeData>{};
-
-ThemeData betterNotesTheme(
-  Brightness brightness, {
-  bool highContrast = false,
-}) => _themeCache.putIfAbsent((
-  brightness,
-  highContrast,
-), () => _createBetterNotesTheme(brightness, highContrast: highContrast));
-
-ThemeData _createBetterNotesTheme(
-  Brightness brightness, {
-  required bool highContrast,
-}) {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF795082),
-    brightness: brightness,
-    secondary: const Color(0xFFBD644B),
-    tertiary: const Color(0xFF387F72),
-    contrastLevel: highContrast ? 1 : 0,
-  );
-  return ThemeData(
-    useMaterial3: true,
-    brightness: brightness,
-    colorScheme: scheme,
-    focusColor: scheme.primary.withValues(alpha: 0.24),
-    scaffoldBackgroundColor: brightness == Brightness.light
-        ? const Color(0xFFFFFAF6)
-        : const Color(0xFF1E1A21),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide.none,
-      ),
-    ),
-    appBarTheme: const AppBarTheme(centerTitle: false),
   );
 }
