@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BetterNotes Privacy Policy</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;max-width:46rem;margin:3rem auto;padding:0 1.25rem;color:#1b1b1b}
+a{color:#0b57d0}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .7rem;text-align:left;vertical-align:top}</style></head>
+<body><p><a href="./">&larr; BetterNotes home</a></p>
+<h1>BetterNotes Privacy Policy</h1>
+<p><strong>Effective date:</strong> 2026-11-07</p>
+<p><strong>Developer:</strong> Azrin Freeman ("I", "me")</p>
+<p><strong>Contact:</strong> azrinfreeman2@gmail.com</p>
+<p><strong>Project:</strong> https://github.com/Azrinfreeman/BetterNotes</p>
+<p>BetterNotes is a notes app. Your notes belong to you. This policy explains what data the app handles and where it goes.</p>
+<h2>Summary</h2>
+<ul>
+<li>Notes, images and settings are stored <strong>on your device</strong>.</li>
+<li>I run no server that receives your notes. I do not collect analytics, advertising identifiers or crash reports.</li>
+<li>Two features send data off your device, and <strong>only if you turn them on</strong>: Google Drive backup and cloud sync.</li>
+</ul>
+<h2>Data stored on your device</h2>
+<p>Notes, attachments and pictures, tags, reminders and app settings are stored in the app's local data folder on your computer. I cannot see them. Uninstalling the app or deleting that folder removes them, unless you have made a backup.</p>
+<h2>Google Drive backup (optional)</h2>
+<p>If you choose <strong>Back up to Google Drive</strong>, you sign in with your Google account in your web browser.</p>
+<p><strong>What the app requests</strong></p>
+<table>
+<tr><th>Permission</th><th>Why</th></tr>
+<tr><td><code>drive.appdata</code></td><td>Lets BetterNotes read and write one hidden, app-specific folder in your own Google Drive. The app cannot see, list or change any of your other Drive files.</td></tr>
+<tr><td><code>openid</code> and <code>email</code></td><td>Shows which Google account is connected.</td></tr>
+</table>
+<p><strong>What is uploaded:</strong> a backup file (a zip) containing your notes, images and settings. The backup is stored only in that hidden folder in <strong>your</strong> Google Drive. It counts against your Google storage quota. The app keeps the newest 3 backups per device and deletes older ones from that folder.</p>
+<p><strong>Automatic backup:</strong> if you turn on daily automatic backup, the app stores a Google refresh token in the Windows Credential Manager so it can upload without asking you to sign in again. If automatic backup is off, no token is saved. Turning it off or disconnecting removes the stored token.</p>
+<p><strong>Who sees the data:</strong> only you and Google, under Google's own terms. I never receive your Google tokens, your email address or your backups. The sign-in runs between your computer and Google directly.</p>
+<p><strong>Revoking access:</strong> you can disconnect inside the app, or remove BetterNotes at any time at https://myaccount.google.com/permissions. You can delete backups by removing the app's hidden data from your Google Drive settings ("Manage apps").</p>
+<p>BetterNotes's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Google data is used only to provide the backup and restore feature. It is not sold, not used for advertising, not used to train AI models, and not read by humans.</p>
+<h2>Cloud sync (optional)</h2>
+<p>If a build of BetterNotes is configured with a cloud sync service and you sign in, your notes and note pictures are sent to that service (Supabase) and stored under your account so you can use them on more than one device. Sign-in is by Google or another provider you choose; the provider tells the service your name and email so it can create your account. Pictures are kept in a private storage area readable only by your account. If you do not sign in, nothing is sent. You can delete your synced data by deleting your notes inside the app or by contacting me at the address above.</p>
+<h2>Other data</h2>
+<ul>
+<li><strong>Browser links:</strong> the app may open links in your default browser. Those sites have their own policies.</li>
+<li><strong>Update checks and installer:</strong> the app does not phone home. Downloads come from GitHub, which has its own privacy policy.</li>
+<li><strong>Children:</strong> BetterNotes is not directed to children under 13 and I do not knowingly collect their data.</li>
+</ul>
+<h2>Security</h2>
+<p>Backup files go to Google over HTTPS. Refresh tokens are held in the Windows Credential Manager. Local notes are protected by your Windows account. Backups in your Drive are protected by your Google account, so keep it secured with a strong password and two-step verification.</p>
+<h2>Your choices</h2>
+<p>You can use BetterNotes fully offline, decline Google Drive and cloud sync, disconnect them at any time, and delete your data as described above.</p>
+<h2>Changes</h2>
+<p>If this policy changes, I will update the date at the top and publish the new version at the same address. Material changes will also be noted in the release notes.</p>
+<h2>Contact</h2>
+<p>Questions or requests: azrinfreeman2@gmail.com</p>
+</body></html>
