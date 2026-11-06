@@ -2322,6 +2322,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{spaces} spaces and {lines} blank lines removed'**
   String cleanupCounts(int spaces, int lines);
+
+  /// No description provided for @driveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive backup'**
+  String get driveTitle;
+
+  /// No description provided for @driveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up or import a verified snapshot'**
+  String get driveSubtitle;
+
+  /// No description provided for @driveIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups are readable ZIP files protected by your Google account. They do not sync changes between devices.'**
+  String get driveIntro;
+
+  /// No description provided for @driveRetentionNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The newest 3 backups from this device are kept; backups from other devices are never removed.'**
+  String get driveRetentionNote;
+
+  /// No description provided for @driveAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up automatically once a day'**
+  String get driveAutoTitle;
+
+  /// No description provided for @driveAutoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps you signed in on this device and uploads while BetterNotes is open.'**
+  String get driveAutoSubtitle;
+
+  /// No description provided for @driveAutoOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Google Drive backup turned on.'**
+  String get driveAutoOn;
+
+  /// No description provided for @driveAutoOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily backup turned off. The saved sign-in is kept until you disconnect.'**
+  String get driveAutoOff;
+
+  /// No description provided for @driveAutoNeedsSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Google Drive first.'**
+  String get driveAutoNeedsSignIn;
+
+  /// No description provided for @driveAutoRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up to Google Drive…'**
+  String get driveAutoRunning;
+
+  /// No description provided for @driveAutoPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the first automatic backup.'**
+  String get driveAutoPending;
+
+  /// No description provided for @driveAutoLastAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last automatic backup: {time}'**
+  String driveAutoLastAt(String time);
+
+  /// No description provided for @driveSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Google sign-in expired. Connect again.'**
+  String get driveSessionExpired;
+
+  /// No description provided for @driveNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive is not configured for this build.'**
+  String get driveNotConfigured;
+
+  /// No description provided for @driveConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Google Drive'**
+  String get driveConnect;
+
+  /// No description provided for @driveBackupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get driveBackupNow;
+
+  /// No description provided for @driveRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get driveRefresh;
+
+  /// No description provided for @driveCleanPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up unfinished uploads'**
+  String get driveCleanPending;
+
+  /// No description provided for @driveDisconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get driveDisconnect;
+
+  /// No description provided for @driveNoBackups.
+  ///
+  /// In en, this message translates to:
+  /// **'No verified backups found.'**
+  String get driveNoBackups;
+
+  /// No description provided for @driveSnapshotsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified backups'**
+  String get driveSnapshotsHeader;
+
+  /// No description provided for @driveImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get driveImport;
+
+  /// No description provided for @driveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in as {email}'**
+  String driveAccount(String email);
+
+  /// No description provided for @driveAccountUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in. The Google account name is unavailable.'**
+  String get driveAccountUnknown;
+
+  /// No description provided for @driveCancelSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sign-in'**
+  String get driveCancelSignIn;
+
+  /// No description provided for @driveSignInCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in cancelled.'**
+  String get driveSignInCancelled;
+
+  /// No description provided for @driveUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup uploaded and verified.'**
+  String get driveUploaded;
+
+  /// No description provided for @driveUploadedPruned.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup uploaded and verified. {count} older backups removed.'**
+  String driveUploadedPruned(int count);
+
+  /// No description provided for @drivePruneFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup uploaded and verified, but {count} older backups could not be removed.'**
+  String drivePruneFailed(int count);
+
+  /// No description provided for @drivePendingNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No unfinished uploads found.'**
+  String get drivePendingNone;
+
+  /// No description provided for @drivePendingRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unfinished uploads removed from Drive.'**
+  String drivePendingRemoved(int count);
+
+  /// No description provided for @drivePendingPartlyRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'{removed} unfinished uploads removed, {failed} could not be deleted.'**
+  String drivePendingPartlyRemoved(int removed, int failed);
+
+  /// No description provided for @driveImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import backup as copies'**
+  String get driveImportTitle;
+
+  /// No description provided for @driveImportSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{notes} notes, including {trash} in Trash, and {images} images. Existing notes will stay in place.'**
+  String driveImportSummary(int notes, int trash, int images);
+
+  /// No description provided for @driveRestorePreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore portable preferences'**
+  String get driveRestorePreferences;
+
+  /// No description provided for @driveCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get driveCancel;
+
+  /// No description provided for @driveImportCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Import copies'**
+  String get driveImportCopies;
+
+  /// No description provided for @driveImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} note copies.'**
+  String driveImported(int count);
+
+  /// No description provided for @driveSnapshotDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} · {size} MB'**
+  String driveSnapshotDetails(String time, String size);
+
+  /// No description provided for @driveErrorNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Drive is not configured for this build.'**
+  String get driveErrorNotConfigured;
+
+  /// No description provided for @driveErrorDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in was denied or closed. Try again and allow Drive access.'**
+  String get driveErrorDenied;
+
+  /// No description provided for @driveErrorTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in timed out. Try again.'**
+  String get driveErrorTimedOut;
+
+  /// No description provided for @driveErrorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach Google Drive. Check your connection and try again.'**
+  String get driveErrorNetwork;
+
+  /// No description provided for @driveErrorIntegrity.
+  ///
+  /// In en, this message translates to:
+  /// **'The downloaded backup failed its integrity check and was not imported.'**
+  String get driveErrorIntegrity;
+
+  /// No description provided for @driveErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the Drive operation. Check your connection and account, then try again.'**
+  String get driveErrorGeneric;
 }
 
 class _AppLocalizationsDelegate

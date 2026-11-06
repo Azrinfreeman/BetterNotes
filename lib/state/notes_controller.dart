@@ -10,6 +10,10 @@ import '../data/cloud_sync.dart';
 import '../data/app_log.dart';
 import '../data/auto_backup.dart' as auto_backup;
 import '../data/backup.dart';
+import '../data/device_label.dart';
+import '../data/google_drive_backup.dart';
+import '../data/google_drive_client.dart';
+import '../data/google_drive_session.dart';
 import '../data/local_store.dart';
 import '../data/clipboard_image.dart';
 import '../data/image_shrink.dart';
@@ -79,7 +83,12 @@ class SavedFilter {
 }
 
 class NotesController extends NoteEditorStore {
-  NotesController(this.store, this.client) {
+  NotesController(
+    this.store,
+    this.client, {
+    DriveSessionStore? driveSessions,
+    this.driveUploader,
+  }) : driveSessions = driveSessions ?? SecureDriveSessionStore() {
     if (client != null) {
       _authSubscription = client!.auth.onAuthStateChange.listen((event) {
         _handleAuthChange(event.session?.user.id);
@@ -87,6 +96,10 @@ class NotesController extends NoteEditorStore {
     }
     _poll = Timer.periodic(const Duration(seconds: 20), (_) => sync());
   }
+
+  /// Injected by tests so automatic backup never touches Google.
+  final DriveBackupUploader? driveUploader;
+  final DriveSessionStore driveSessions;
 
   final LocalStore store;
   final SupabaseClient? client;
@@ -114,6 +127,15 @@ class NotesController extends NoteEditorStore {
   String? autoBackupError;
   bool autoBackupRunning = false;
   Timer? _autoBackupTimer;
+
+  /// Automatic Google Drive backup. Requires a saved refresh token.
+  bool driveAutoEnabled = false;
+  DateTime? driveAutoLast;
+  String? driveAutoError;
+  bool driveAutoRunning = false;
+  Timer? _driveAutoTimer;
+  Timer? _driveAutoKick;
+  Duration driveAutoInterval = const Duration(hours: 24);
 
   /// How often an automatic backup is due.
   Duration autoBackupInterval = const Duration(hours: 24);
@@ -368,6 +390,15 @@ class NotesController extends NoteEditorStore {
   int deletionSerial = 0;
   String? recentlyDeletedId;
   String? saveFailure;
+  String? windowRestoreFailure;
+  Future<void> Function()? retryWindowRestore;
+
+  void reportWindowRestoreFailure(String? message) {
+    windowRestoreFailure = message;
+    if (message != null) AppLog.write('ERROR', 'Window restoration', message);
+    notifyListeners();
+  }
+
   Future<void> Function()? flushDesktopEditors;
   Future<void> Function(String)? flushDesktopEditor;
 
@@ -446,6 +477,13 @@ class NotesController extends NoteEditorStore {
       await store.getSetting<String>('autoBackupLast') ?? '',
     );
     _scheduleAutoBackup();
+    driveAutoEnabled =
+        await store.getSetting<bool>('driveAutoEnabled') ?? false;
+    driveAutoError = await store.getSetting<String>('driveAutoError');
+    driveAutoLast = DateTime.tryParse(
+      await store.getSetting<String>('driveAutoLast') ?? '',
+    );
+    _scheduleDriveAutoBackup();
     savedFilters = [
       for (final value
           in await store.getSetting<List>('savedFilters') ?? const [])
@@ -1046,6 +1084,124 @@ class NotesController extends NoteEditorStore {
     }
   }
 
+  void _scheduleDriveAutoBackup() {
+    _driveAutoTimer?.cancel();
+    _driveAutoTimer = null;
+    _driveAutoKick?.cancel();
+    _driveAutoKick = null;
+    if (!driveAutoEnabled) return;
+    _driveAutoTimer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => unawaited(runDriveAutoBackup()),
+    );
+    // Startup is busy; check a little later.
+    _driveAutoKick = Timer(
+      const Duration(seconds: 45),
+      () => unawaited(runDriveAutoBackup()),
+    );
+  }
+
+  /// Turns the daily Google Drive backup on or off. Enabling needs a saved
+  /// sign-in, because the backup runs without the Drive screen open.
+  Future<bool> setDriveAutoEnabled(bool enabled) async {
+    if (enabled && await driveSessions.readRefreshToken() == null) {
+      return false;
+    }
+    driveAutoEnabled = enabled;
+    await store.setSetting('driveAutoEnabled', enabled);
+    driveAutoError = null;
+    await store.deleteSetting('driveAutoError');
+    notifyListeners();
+    _scheduleDriveAutoBackup();
+    if (enabled) {
+      _driveAutoKick?.cancel();
+      _driveAutoKick = Timer(
+        const Duration(seconds: 5),
+        () => unawaited(runDriveAutoBackup(force: true)),
+      );
+    }
+    return true;
+  }
+
+  /// Saves the Google sign-in so backups can run after the screen closes.
+  Future<void> saveDriveSession({
+    required String refreshToken,
+    String? email,
+  }) async {
+    await driveSessions.save(refreshToken: refreshToken, email: email);
+    notifyListeners();
+  }
+
+  /// Forgets the saved sign-in and turns automatic backup off.
+  Future<void> forgetDriveSession() async {
+    await driveSessions.clear();
+    driveAutoEnabled = false;
+    driveAutoLast = null;
+    driveAutoError = null;
+    await store.setSetting('driveAutoEnabled', false);
+    await store.deleteSetting('driveAutoLast');
+    await store.deleteSetting('driveAutoError');
+    _driveAutoTimer?.cancel();
+    _driveAutoTimer = null;
+    notifyListeners();
+  }
+
+  /// Uploads a verified snapshot when one is due (or [force]d). A missing or
+  /// revoked sign-in is recorded as an error, never as a silent success.
+  Future<bool> runDriveAutoBackup({bool force = false}) async {
+    if (!driveAutoEnabled || driveAutoRunning) return false;
+    final last = driveAutoLast;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < driveAutoInterval) {
+      return false;
+    }
+    driveAutoRunning = true;
+    notifyListeners();
+    try {
+      final bytes = await exportBackup();
+      final uploader = driveUploader;
+      if (uploader != null) {
+        await uploader(bytes, localDeviceLabel);
+      } else {
+        await _uploadSnapshotToDrive(bytes);
+      }
+      final now = DateTime.now();
+      driveAutoLast = now;
+      driveAutoError = null;
+      await store.setSetting('driveAutoLast', now.toUtc().toIso8601String());
+      await store.deleteSetting('driveAutoError');
+      return true;
+    } catch (error) {
+      driveAutoError = 'Google Drive backup failed: $error';
+      AppLog.write('ERROR', 'Google Drive automatic backup failed', error);
+      await store.setSetting('driveAutoError', driveAutoError!);
+      return false;
+    } finally {
+      driveAutoRunning = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _uploadSnapshotToDrive(Uint8List bytes) async {
+    final token = await driveSessions.readRefreshToken();
+    if (token == null) {
+      throw StateError('No saved Google sign-in. Connect again.');
+    }
+    final client = googleDriveClientFromRefreshToken(token);
+    try {
+      final drive = GoogleDriveBackup(client);
+      await drive.upload(bytes, device: localDeviceLabel);
+      await drive.pruneDevice(device: localDeviceLabel);
+      final refreshed = client.credentials.refreshToken;
+      if (refreshed != null && refreshed != token) {
+        await driveSessions.save(refreshToken: refreshed);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   /// Reminders that are due now and have not been shown yet.
   List<Note> dueReminders([DateTime? now]) {
     final at = (now ?? DateTime.now()).toUtc();
@@ -1282,6 +1438,34 @@ class NotesController extends NoteEditorStore {
         inlineImages = prefs['inlineImages'] as bool? ?? inlineImages;
         customWindowButtons =
             prefs['customWindowButtons'] as bool? ?? customWindowButtons;
+        if (prefs['imageQuality'] case final String quality) {
+          imageQuality = ImageQuality.values.byName(quality);
+        }
+        alwaysShowNoteHeader =
+            prefs['alwaysShowNoteHeader'] as bool? ?? alwaysShowNoteHeader;
+        if (prefs['libraryOptions'] case final Map options) {
+          libraryView =
+              LibraryView.values
+                  .where((v) => v.name == options['view'])
+                  .firstOrNull ??
+              LibraryView.notes;
+          noteSort =
+              NoteSort.values
+                  .where((v) => v.name == options['sort'])
+                  .firstOrNull ??
+              NoteSort.updated;
+          selectedTags = normalizeTags(
+            (options['tags'] as List? ?? const []).whereType<String>(),
+          );
+          compactView = options['compact'] as bool? ?? false;
+          favoritesFirst = options['favoritesFirst'] as bool? ?? true;
+          _libraryCache = null;
+        }
+        if (prefs['savedFilters'] case final List filters) {
+          savedFilters = List.unmodifiable(
+            filters.map((value) => SavedFilter.fromJson(value as Map)),
+          );
+        }
         notifyListeners();
       }
       _scheduleSync();
@@ -1355,6 +1539,8 @@ class NotesController extends NoteEditorStore {
   void dispose() {
     _poll?.cancel();
     _autoBackupTimer?.cancel();
+    _driveAutoTimer?.cancel();
+    _driveAutoKick?.cancel();
     _debounce?.cancel();
     _authSubscription?.cancel();
     super.dispose();

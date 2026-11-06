@@ -13,6 +13,8 @@ flutter run -d chrome --web-port 5173
 
 For the Windows app, run `flutter run -d windows`. Notes open in their own windows; use the clipboard button in a note or `Ctrl+V` to paste an image. Closing a note window keeps the note in the list. Windows also restores notes that were open when the app last closed.
 
+The library appears before saved note windows reopen. If a window cannot reopen, use its restoration notice's **Retry** action or open the note from the library. Quitting before restoration finishes keeps the pending notes remembered for the next launch.
+
 **Settings → Image placement** offers **Above text (current)**, the default, and **Within note**. Within note inserts new images at the cursor between paragraphs and moves the cursor below the image so you can continue typing. Pasting in the middle of a paragraph splits it, preserving the remaining text. The choice applies to clipboard paste and image selection, is saved locally, and updates open Windows note windows. Existing images stay where they are when you switch preferences. Inline images support preview, removal, undo, and redo. Text wrapping beside images is not included. This feature is included in the dated 20261008 portable ZIP.
 
 
@@ -61,6 +63,8 @@ Use a note's **More actions → Title and tags** to set an optional title and co
 Titles, favorites, tags, Archive and library preferences currently remain local. Complete backup/import transfers note metadata; the existing configured cloud schema continues syncing body content without these new organization fields. The 20261009 portable ZIP includes the three implementation phases; older ZIPs predate them. Build and package verification are recorded in `STATUS.md`.
 
 Backups are readable, unencrypted ZIPs. Limits are 128 MB per backup, 5,000 notes, 10,000 images, 8 MB per image, and 16 MB of note JSON. Keep a complete exported ZIP; recompressing its contents is unsupported. Desktop, web, Android, and iOS support file import (mobile import is untested on devices); mobile export uses the share sheet. Tokens, other accounts, startup registration, and window bounds are excluded.
+
+In the current source, backups also include image quality, note-header visibility, library view options and saved searches. A backup fails if a saved version or its image cannot be included, rather than silently omitting it. Archives containing these newer preferences use version 3 and require a BetterNotes version that supports it; existing version 1 and 2 archives can still be imported. Automatic Trash retention and device-specific settings are not transferred. A manual Windows Google Drive flow is under development and requires owner configuration and real-account testing; iCloud backup is not yet available.
 
 All three approved phases are implemented and included in the 20261009 portable package. Older packages are preserved; see `STATUS.md` for Windows build and package verification.
 

@@ -17,6 +17,7 @@ import '../desktop/window_chrome.dart';
 import '../state/notes_controller.dart';
 import '../l10n/l10n.dart';
 import 'about_page.dart';
+import 'google_drive_backup_page.dart';
 import 'shortcuts_help.dart';
 import 'settings_sections.dart';
 
@@ -1070,6 +1071,19 @@ class _SettingsPageState extends State<SettingsPage> {
                       ? null
                       : () => _fileAction(_importBackup),
                 ),
+                if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows)
+                  ListTile(
+                    leading: const Icon(Icons.cloud_outlined),
+                    title: Text(context.l10n.driveTitle),
+                    subtitle: Text(context.l10n.driveSubtitle),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => GoogleDriveBackupPage(
+                          controller: widget.controller,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (auto_backup.canAutoBackup) ..._autoBackupTiles(),
                 ListTile(
                   leading: const Icon(Icons.description_outlined),

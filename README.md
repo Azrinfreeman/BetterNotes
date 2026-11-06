@@ -110,8 +110,9 @@ flutter test
 ## Documentation
 
 - [User guide](docs/USER_GUIDE.md): features, keyboard shortcuts, backups, and sync setup
-- [Implementation plan](IMPLEMENTATION.md): original design and feature plan
+- [Implementation plan](IMPLEMENTATION.md): startup work and earlier feature plans
 - [Status](STATUS.md): development log and verification notes
+- [Startup and note restoration](docs/tutorial/startup-and-note-restoration.md): scheduling, failure recovery, diagnostics, and native benchmarks
 
 ## License
 

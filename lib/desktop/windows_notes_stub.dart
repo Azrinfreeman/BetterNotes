@@ -13,7 +13,14 @@ class DesktopCoordinator {
   ValueListenable<int>? get closeRequests => null;
   ValueListenable<int>? get searchRequests => null;
 
-  Future<void> bindMain(NotesController controller) async {}
+  Future<void> bindMain(
+    NotesController controller, {
+    bool diagnosticMode = false,
+  }) async {}
+  Future<void> quit() async {}
+  Future<void> restoreSession() async {}
+  Future<void> dispose() async {}
+  int startupConcurrency = 1;
   Future<void> openNote(String noteId) async {}
   Future<void> createAndOpenNote() async {}
   Future<void> focusSearch() async {}

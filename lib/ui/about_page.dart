@@ -49,6 +49,9 @@ Future<String> collectDiagnostics(NotesController c) async {
     'Automatic backups': c.autoBackupFolder == null ? 'off' : 'on',
     'Last automatic backup': c.autoBackupLast?.toIso8601String() ?? 'never',
     'Automatic backup error': c.autoBackupError ?? 'none',
+    'Google Drive automatic backup': c.driveAutoEnabled ? 'on' : 'off',
+    'Last Google Drive backup': c.driveAutoLast?.toIso8601String() ?? 'never',
+    'Google Drive backup error': c.driveAutoError ?? 'none',
     'Fast note opening': c.fastNoteOpening,
     'Trash retention days': c.trashRetentionDays,
   };

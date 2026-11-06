@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>BetterNotes — Startup and note restoration</title>
+<style>
+:root { color-scheme: light; font-family: "Segoe UI", sans-serif; color: #242320; background: #fff; }
+body { max-width: 48rem; margin: 3rem auto; padding: 0 1.5rem; font-size: 16px; line-height: 1.6; }
+h1 { font-size: 2rem; line-height: 1.2; letter-spacing: -.025em; }
+h2 { font-size: 1.3rem; margin-top: 2rem; break-after: avoid; }
+li { margin: .55rem 0; }
+code { font-family: Consolas, monospace; font-size: .88em; overflow-wrap: anywhere; }
+pre { background: #f4f3f0; padding: 1rem; white-space: pre-wrap; border-left: 3px solid #666255; }
+p { margin: .9rem 0; }
+footer { border-top: 1px solid #ccc; margin-top: 2rem; padding-top: 1rem; color: #555; font-size: .85rem; }
+@page { size: letter; margin: .7in; }
+@media print { body { margin: 0; padding: 0; max-width: none; font-size: 10pt; } pre { break-inside: avoid; } }
+</style><main><h1>Startup and note restoration</h1>
+<p>BetterNotes displays its library before reopening saved Windows note windows. Production restoration starts one child engine at a time and shows restored editors without moving keyboard focus. Fast note opening still keeps one reusable spare editor, but warms it after restoration instead of delaying the library. Each note has its own Flutter engine, so large sessions still reopen gradually.</p>
+<p>Normal use needs no new setting. Close BetterNotes through Quit to save and remember the session. A failed restoration leaves the library available and displays a separate error with Retry. Retry rechecks the remembered session; opening an individual note from the library also retries it. Save errors keep their existing save-specific Retry action.</p>
+<h2>Source and responsibilities</h2>
+<ul>
+<li><code>lib/main.dart</code>: required local initialization, first library frame, and post-rasterization restoration. The explicit diagnostic entry point uses an in-memory notebook instead of user storage or cloud.</li>
+<li><code>lib/desktop/windows_notes_io.dart</code>: restore queue, per-note coalescing, interactive priority, native creation ordering, readiness deadlines, window assignments, remembered IDs, spare reuse, and shutdown. <code>windows_notes_stub.dart</code> preserves the conditional API outside desktop Windows.</li>
+<li><code>windows/runner/flutter_window.cpp</code>: inactive child presentation and temporary native handle tracking. A child that never acknowledges its first frame can be destroyed while still hidden, even if its Dart handler failed to register.</li>
+<li><code>windows/runner/flutter_accessibility_guard.cpp</code> and <code>.h</code>: a platform-thread hook protects Flutter view construction and destruction from premature accessibility queries. <code>main.cpp</code> installs the guard before creating controllers; <code>flutter_window.cpp</code> marks each constructed view ready. Ready views use Flutter&#x27;s normal accessibility provider.</li>
+<li><code>lib/state/notes_controller.dart</code> and <code>lib/ui/notes_home.dart</code>: restoration error state and the library Retry action, separate from save failures.</li>
+<li><code>lib/data/startup_timing.dart</code>: optional monotonic stage timings. Aggregate measurements contain counts and durations, without note contents or account details.</li>
+<li><code>lib/ui/review_notebook.dart</code>: disposable benchmark notes, including bold text, long paragraphs, and a local synthetic image. <code>lib/desktop/startup_benchmark_io.dart</code> writes diagnostic JSON only when explicitly requested.</li>
+<li><code>test/startup_restore_test.dart</code> and <code>test/note_open_performance_test.dart</code>: queue, failure recovery, reuse, stale-state, and session-lifecycle regressions.</li>
+<li><code>test/native/flutter_accessibility_guard_test.cpp</code>: native Windows regression for early queries, ready-provider forwarding, and parent teardown, repeated for 100 lifecycles.</li>
+</ul>
+<p>All paths above are relative to the repository root. Edit these sources, not <code>build/</code>, the generated plugin registrant, or files in the package cache.</p>
+<h2>How startup works</h2>
+<p>The main engine opens storage, loads the controller, and binds desktop channels before drawing the library. Once the first frame has rasterized, <code>restoreSession()</code> starts one owned future. Repeated calls share that future. Each remembered ID becomes a queued request; repeated requests for the same note share its result. An interactive open promotes that request and takes the next available slot.</p>
+<p>Native engine creation runs on the Windows platform thread and is serialized through <code>_nativeCreateTail</code>. The production queue waits for that child to become ready before starting the next engine. The diagnostic-only two-slot override supports performance comparisons after engine or plugin changes. Each child reports readiness without showing itself. The parent then requests presentation, with activation only for interactive opens.</p>
+<p>Native stress testing exposed a crash in Flutter&#x27;s <code>OnUpdateSemanticsEnabled</code> with both startup limits. The engine&#x27;s source forwards that callback to a view delegate without a null check. The app-owned accessibility guard intercepts <code>WM_GETOBJECT</code> only while a <code>FLUTTERVIEW</code> is under construction or teardown. It forwards queries after controller construction, and revokes readiness before a parent destroys the controller. It uses documented Windows hooks and subclassing; neither the Flutter SDK nor the package cache needs this guard copied into it. Keep the guard alive for the platform message loop and retain both main-view and child-view readiness calls when changing controller setup.</p>
+<p>The runner claims child window handles in creation order until readiness succeeds. If readiness times out, it discards the hidden native window and the coordinator releases that assignment. Late readiness cannot revive the failed assignment. Native creation itself is synchronous and cannot be cancelled by a Dart timeout; a completely blocked native create remains a platform limitation.</p>
+<p>Remembered IDs use an ordered persistence chain. Failed restore IDs and work not attempted before shutdown remain remembered. Missing, deleted, and archived IDs are removed. Shutdown stops new queue work, waits for in-flight startup, flushes editors, and closes windows. A save failure keeps the app open.</p>
+<h2>Change a startup limit</h2>
+<p>To allow more time for a slow child, change <code>childReadyTimeout</code> from <code>Duration(seconds: 15)</code> to <code>Duration(seconds: 20)</code> in <code>DesktopCoordinator</code> in <code>lib/desktop/windows_notes_io.dart</code>. Rebuild and run the timeout regression with its shorter test override. A child that never acknowledges readiness should now wait up to 20 seconds before cleanup; successful children should behave the same. This cannot interrupt native engine creation, which is synchronous.</p>
+<p><code>_startupConcurrency</code> defaults to one. The setter permits an explicit diagnostic override of two; use repeat-launch measurements before changing the default. Native construction is serialized in either mode, so extra slots do not guarantee faster restoration. The spare refill delay remains 1,500 milliseconds in <code>_scheduleSpareRefill()</code>, with lifecycle and preference checks before creating an idle engine.</p>
+<h2>Build, test, and measure</h2>
+<p>Use the existing Flutter SDK. On the current machine it is <code>.tools/flutter</code>; <code>STATUS.md</code> records the machine-specific Git safe-directory workaround. From the repository root in PowerShell:</p>
+<pre><code>$env:GIT_CONFIG_COUNT = &#x27;1&#x27;
+$env:GIT_CONFIG_KEY_0 = &#x27;safe.directory&#x27;
+$env:GIT_CONFIG_VALUE_0 = &#x27;*&#x27;
+./.tools/flutter/bin/flutter.bat analyze --no-pub lib test
+./.tools/flutter/bin/flutter.bat test --no-pub test/startup_restore_test.dart test/note_open_performance_test.dart
+./.tools/flutter/bin/flutter.bat test --no-pub
+./.tools/flutter/bin/flutter.bat build windows --release --no-pub</code></pre>
+<p>The native guard test uses the existing Visual Studio CMake installation. On this machine:</p>
+<pre><code>$cmake = &#x27;C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe&#x27;
+&amp; $cmake -S test/native -B build/native-startup-tests -G &#x27;Visual Studio 18 2026&#x27; -A x64
+&amp; $cmake --build build/native-startup-tests --config Release
+./build/native-startup-tests/Release/flutter_accessibility_guard_test.exe</code></pre>
+<p>Expected output: <code>100 construction / accessible-ready / parent-teardown cycles passed.</code> On another machine, use its installed CMake executable and Visual Studio generator. This test checks Win32 lifecycle behavior with a small fake view; it does not substitute for a screen-reader check of the real app.</p>
+<p>For a repeatable native benchmark, after building:</p>
+<pre><code>./scripts/benchmark-startup.ps1 -Notes 10 -Runs 5 -Concurrency 1</code></pre>
+<p>The script launches visible windows because a hidden Windows startup flag can suppress the first library presentation. It starts the release executable with <code>--ui-review --startup-benchmark=N --benchmark-output=PATH</code>. This explicit combination bypasses the native single-instance redirect, uses an in-memory fixture, disables reminder-task integration, and exits through normal save/close after recording a result. It can run alongside an installed copy. Do not remove those isolation flags or benchmark against the real notes database. JSON files and a summary stay under the specified output directory. The script samples process CPU and working-set memory at restore completion, before the diagnostic app exits. This is not a steady-state memory or leak measurement; deferred spare warming can increase memory afterwards.</p>
+<p>For interactive checks, launch the executable with the same diagnostic flags plus <code>--benchmark-stay-open</code>; close the library normally when finished. The fixture remains in memory, so do not use it for real notes.</p>
+<p>Use <code>-Notes 0</code>, <code>1</code>, <code>5</code>, <code>10</code>, or <code>20</code> to change session size. Timings from <code>fixtureReady</code> exclude synthetic fixture construction and real database opening. <code>observedLaunchToResultMs</code> includes process launch and fixture setup, with up to roughly 100 ms polling granularity; it is not an exact launch-to-visible timestamp. <code>mainFirstFrame</code> measures the library frame callback; <code>mainRasterized</code> confirms rasterization before restoration starts, and <code>libraryShown</code> records acknowledgement of explicit library presentation. <code>restoreComplete</code> follows presentation acknowledgements; it does not prove every image is decoded or every user interaction was checked. Native creation totals are cumulative work, not an additional elapsed phase to add to restore time.</p>
+<p>To inspect normal startup stage durations, build with <code>--dart-define=STARTUP_TIMING=true</code> and observe diagnostic output. The default build does not emit timing summaries. No note contents are included, and timing events do not synchronously append to the application log.</p>
+<h2>Verification and limits</h2>
+<p>Static analysis, 13 focused startup/performance tests, the native 100-cycle guard regression, and the final Windows release build passed. An earlier complete suite passed 156 tests with one skip before the final cleanup-error boundary. The guarded release completed ten repeated 10-note launches, plus size checks with 0, 1, 5, and 20 notes, and exited normally.</p>
+<p>In the five production-limit 10-note runs, the library frame median fell from 20,830 ms to 63 ms after fixture setup. Complete restoration took 20,804 ms versus the baseline&#x27;s 17,607 ms: the planned 30% reduction was not achieved. The two-slot diagnostic median was slower still. Keep the earlier library and deferred warming benefits separate from full-restoration performance. The fixture excludes real storage/cloud initialization; these are warm/repeated synthetic launches, not cold-disk or owner-notebook results. <code>IMPLEMENTATION.md</code> and <code>STATUS.md</code> record timings and resource limits.</p>
+<p>Native screenshots confirmed the library and restored editors, and their accessibility trees were exposed. Search focus was reached, but synthetic typing and later element references were inconclusive. Native editing/filtering and focus retention during restoration remain manual checks. Automated channel tests support save/session behavior; this fixture does not verify durable real-notebook restart persistence.</p>
+<p>Keep native window edits, focus checks, bounds persistence, tray/quick capture, reminder-only launch, and save-failure recovery in the manual regression checklist when changing this code. Mocked channel tests cover scheduling and cleanup decisions but cannot prove Windows focus behavior or native destruction. Each window remains a separate Flutter engine, so restoring many windows still has a CPU and memory cost.</p>
+<h2>Maintain this tutorial</h2>
+<p>This Markdown file is the authoritative editable source. Its HTML companion is generated by the standard-library-only exporter:</p>
+<pre><code>python scripts/export-startup-tutorial.py</code></pre>
+<p>The exporter supports the headings, paragraphs, lists, inline code, and fenced code used here. Review the HTML after regeneration. PDF export is optional through the browser Print dialog; no PDF tooling was installed for this change.</p></main><footer>Generated from startup-and-note-restoration.md.
+Regenerate with python scripts/export-startup-tutorial.py.</footer></html>

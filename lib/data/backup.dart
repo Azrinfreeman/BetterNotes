@@ -21,6 +21,7 @@ final _idPattern = RegExp(r'^[A-Za-z0-9_-]{1,100}$');
 
 /// Schema 1 is an uncompressed ZIP: manifest.json, notes.json, `assets/<id>`.
 /// Version 2 adds `revisions.json` (each note's saved earlier versions).
+/// Version 3 adds portable editor and library preferences.
 /// No files are extracted to disk. Every payload has a SHA-256 in the manifest.
 class BackupData {
   BackupData(
@@ -127,7 +128,7 @@ class NoteBackup {
       }
       entries['assets/$id'] = bytes;
     }
-    final revisions = await _exportableRevisions(store, notes, entries, total);
+    final revisions = await _exportRevisions(store, notes, entries, total);
     if (revisions.isNotEmpty) {
       entries['revisions.json'] = Uint8List.fromList(
         utf8.encode(
@@ -142,6 +143,10 @@ class NoteBackup {
       'confirmDelete',
       'inlineImages',
       'customWindowButtons',
+      'imageQuality',
+      'alwaysShowNoteHeader',
+      'libraryOptions',
+      'savedFilters',
     ]) {
       final value = await store.getSetting<Object>(key);
       if (value != null) preferences[key] = value;
@@ -150,7 +155,17 @@ class NoteBackup {
       utf8.encode(
         jsonEncode({
           'format': 'BetterNotes',
-          'version': revisions.isEmpty ? 1 : 2,
+          'version':
+              [
+                'imageQuality',
+                'alwaysShowNoteHeader',
+                'libraryOptions',
+                'savedFilters',
+              ].any(preferences.containsKey)
+              ? 3
+              : revisions.isEmpty
+              ? 1
+              : 2,
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'hashes': {
             for (final entry in entries.entries)
@@ -176,10 +191,8 @@ class NoteBackup {
     return bytes;
   }
 
-  /// History is auxiliary: a version whose images are unavailable, or that
-  /// would push the backup over a limit, is left out rather than failing.
-  /// Adds the extra images those versions need to [entries].
-  static Future<List<NoteRevision>> _exportableRevisions(
+  /// Includes every saved version, or fails without producing a partial backup.
+  static Future<List<NoteRevision>> _exportRevisions(
     LocalStore store,
     List<Note> notes,
     Map<String, Uint8List> entries,
@@ -192,26 +205,33 @@ class NoteBackup {
     var jsonBytes = 0;
     for (final revision in all) {
       final pending = <String, Uint8List>{};
-      var usable = revision.imageIds.every(_idPattern.hasMatch);
+      if (!revision.imageIds.every(_idPattern.hasMatch)) {
+        throw StateError('A saved version has an invalid image ID.');
+      }
       for (final id in revision.imageIds) {
-        if (!usable || entries.containsKey('assets/$id')) continue;
+        if (entries.containsKey('assets/$id')) continue;
         final bytes = await store.getImage(id);
-        if (bytes == null || bytes.length > _maxImageBytes) {
-          usable = false;
-        } else {
-          pending['assets/$id'] = bytes;
+        if (bytes == null) {
+          throw StateError(
+            'An image in a saved version is missing locally. Restore the image before retrying the backup.',
+          );
         }
+        if (bytes.length > _maxImageBytes) {
+          throw StateError('An image in a saved version exceeds 8 MB.');
+        }
+        pending['assets/$id'] = bytes;
       }
       final size = utf8.encode(jsonEncode(revision.toJson())).length;
       final added = pending.values.fold<int>(0, (n, b) => n + b.length);
       final assetCount = entries.keys
           .where((k) => k.startsWith('assets/'))
           .length;
-      if (!usable ||
-          jsonBytes + size > _maxNotesBytes ~/ 2 ||
+      if (jsonBytes + size > _maxNotesBytes ~/ 2 ||
           total + added + size > maxBackupBytes - 2 * 1024 * 1024 ||
           assetCount + pending.length > maxBackupAssets) {
-        continue;
+        throw StateError(
+          'Saved versions exceed the backup size or image count limit. Reduce the library or its history and retry.',
+        );
       }
       entries.addAll(pending);
       total += added + size;
@@ -296,7 +316,7 @@ class NoteBackup {
     final manifest = jsonDecode(utf8.decode(manifestBytes)) as Map;
     final version = manifest['version'];
     if (manifest['format'] != 'BetterNotes' ||
-        (version != 1 && version != 2) ||
+        (version != 1 && version != 2 && version != 3) ||
         (version == 1 && entries.containsKey('revisions.json'))) {
       throw const FormatException('Unsupported backup version.');
     }
@@ -309,7 +329,10 @@ class NoteBackup {
         throw const FormatException('Backup SHA-256 check failed.');
       }
     }
-    final preferences = _preferences(manifest['preferences'] as Map? ?? {});
+    final preferences = _preferences(
+      manifest['preferences'] as Map? ?? {},
+      version as int,
+    );
     final rawNotes =
         jsonDecode(utf8.decode(entries.remove('notes.json')!)) as List;
     if (rawNotes.length > maxBackupNotes) {
@@ -469,7 +492,7 @@ class NoteBackup {
     return result;
   }
 
-  static Map<String, Object> _preferences(Map raw) {
+  static Map<String, Object> _preferences(Map raw, int version) {
     final result = <String, Object>{};
     for (final entry in raw.entries) {
       if (entry.key == 'theme' &&
@@ -483,10 +506,80 @@ class NoteBackup {
           ].contains(entry.key) &&
           entry.value is bool) {
         result[entry.key as String] = entry.value as bool;
+      } else if (version >= 3 &&
+          entry.key == 'imageQuality' &&
+          ['balanced', 'smallest', 'original'].contains(entry.value)) {
+        result['imageQuality'] = entry.value as String;
+      } else if (version >= 3 &&
+          entry.key == 'alwaysShowNoteHeader' &&
+          entry.value is bool) {
+        result['alwaysShowNoteHeader'] = entry.value as bool;
+      } else if (version >= 3 &&
+          entry.key == 'libraryOptions' &&
+          entry.value is Map &&
+          _validLibraryOptions(entry.value as Map)) {
+        result['libraryOptions'] = Map<String, dynamic>.from(
+          entry.value as Map,
+        );
+      } else if (version >= 3 &&
+          entry.key == 'savedFilters' &&
+          entry.value is List &&
+          (entry.value as List).every(
+            (value) => value is Map && _validFilter(value),
+          )) {
+        result['savedFilters'] = (entry.value as List)
+            .map((value) => Map<String, dynamic>.from(value as Map))
+            .toList();
       } else {
         throw const FormatException('Unsupported backup preference.');
       }
     }
     return result;
   }
+
+  static bool _validTags(Object? value) =>
+      value is List && value.every((tag) => tag is String);
+
+  static bool _validView(Object? value) => [
+    'notes',
+    'favorites',
+    'archive',
+    'trash',
+    'allActive',
+    'reminders',
+  ].contains(value);
+
+  static bool _validSort(Object? value) => [
+    'updated',
+    'updatedOldest',
+    'created',
+    'createdOldest',
+    'title',
+    'titleDesc',
+    'reminder',
+    'color',
+    'length',
+  ].contains(value);
+
+  static bool _validLibraryOptions(Map value) =>
+      value.keys.every(
+        (key) =>
+            ['view', 'sort', 'tags', 'compact', 'favoritesFirst'].contains(key),
+      ) &&
+      (!value.containsKey('view') || _validView(value['view'])) &&
+      (!value.containsKey('sort') || _validSort(value['sort'])) &&
+      (!value.containsKey('tags') || _validTags(value['tags'])) &&
+      (!value.containsKey('compact') || value['compact'] is bool) &&
+      (!value.containsKey('favoritesFirst') || value['favoritesFirst'] is bool);
+
+  static bool _validFilter(Map value) =>
+      value.keys.every(
+        (key) => ['name', 'query', 'view', 'sort', 'tags'].contains(key),
+      ) &&
+      value['name'] is String &&
+      (value['name'] as String).isNotEmpty &&
+      (!value.containsKey('query') || value['query'] is String) &&
+      (!value.containsKey('view') || _validView(value['view'])) &&
+      (!value.containsKey('sort') || _validSort(value['sort'])) &&
+      (!value.containsKey('tags') || _validTags(value['tags']));
 }

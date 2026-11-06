@@ -869,6 +869,17 @@ class _NotesHomeState extends State<NotesHome> {
             context.l10n.notesHomeSettings,
             warning: true,
           ),
+        if (widget.controller.windowRestoreFailure != null)
+          _notice(
+            widget.controller.windowRestoreFailure!,
+            Icons.error_outline,
+            widget.controller.retryWindowRestore == null
+                ? null
+                : () async {
+                    await widget.controller.retryWindowRestore!();
+                  },
+            context.l10n.noteRetry,
+          ),
         if (widget.controller.saveFailure != null)
           _notice(
             widget.controller.saveFailure!,
@@ -889,7 +900,7 @@ class _NotesHomeState extends State<NotesHome> {
   Widget _notice(
     String message,
     IconData icon,
-    VoidCallback action,
+    VoidCallback? action,
     String label, {
     bool warning = false,
   }) {

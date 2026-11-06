@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   desktop_multi_window
   file_selector_windows
+  flutter_secure_storage_windows
   pasteboard
   screen_retriever_windows
   share_plus

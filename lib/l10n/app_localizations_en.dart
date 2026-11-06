@@ -1349,4 +1349,169 @@ class AppLocalizationsEn extends AppLocalizations {
   String cleanupCounts(int spaces, int lines) {
     return '$spaces spaces and $lines blank lines removed';
   }
+
+  @override
+  String get driveTitle => 'Google Drive backup';
+
+  @override
+  String get driveSubtitle => 'Back up or import a verified snapshot';
+
+  @override
+  String get driveIntro =>
+      'Backups are readable ZIP files protected by your Google account. They do not sync changes between devices.';
+
+  @override
+  String get driveRetentionNote =>
+      'The newest 3 backups from this device are kept; backups from other devices are never removed.';
+
+  @override
+  String get driveAutoTitle => 'Back up automatically once a day';
+
+  @override
+  String get driveAutoSubtitle =>
+      'Keeps you signed in on this device and uploads while BetterNotes is open.';
+
+  @override
+  String get driveAutoOn => 'Daily Google Drive backup turned on.';
+
+  @override
+  String get driveAutoOff =>
+      'Daily backup turned off. The saved sign-in is kept until you disconnect.';
+
+  @override
+  String get driveAutoNeedsSignIn => 'Connect Google Drive first.';
+
+  @override
+  String get driveAutoRunning => 'Backing up to Google Drive…';
+
+  @override
+  String get driveAutoPending => 'Waiting for the first automatic backup.';
+
+  @override
+  String driveAutoLastAt(String time) {
+    return 'Last automatic backup: $time';
+  }
+
+  @override
+  String get driveSessionExpired =>
+      'Saved Google sign-in expired. Connect again.';
+
+  @override
+  String get driveNotConfigured =>
+      'Google Drive is not configured for this build.';
+
+  @override
+  String get driveConnect => 'Connect Google Drive';
+
+  @override
+  String get driveBackupNow => 'Back up now';
+
+  @override
+  String get driveRefresh => 'Refresh';
+
+  @override
+  String get driveCleanPending => 'Clean up unfinished uploads';
+
+  @override
+  String get driveDisconnect => 'Disconnect';
+
+  @override
+  String get driveNoBackups => 'No verified backups found.';
+
+  @override
+  String get driveSnapshotsHeader => 'Verified backups';
+
+  @override
+  String get driveImport => 'Import';
+
+  @override
+  String driveAccount(String email) {
+    return 'Signed in as $email';
+  }
+
+  @override
+  String get driveAccountUnknown =>
+      'Signed in. The Google account name is unavailable.';
+
+  @override
+  String get driveCancelSignIn => 'Cancel sign-in';
+
+  @override
+  String get driveSignInCancelled => 'Sign-in cancelled.';
+
+  @override
+  String get driveUploaded => 'Backup uploaded and verified.';
+
+  @override
+  String driveUploadedPruned(int count) {
+    return 'Backup uploaded and verified. $count older backups removed.';
+  }
+
+  @override
+  String drivePruneFailed(int count) {
+    return 'Backup uploaded and verified, but $count older backups could not be removed.';
+  }
+
+  @override
+  String get drivePendingNone => 'No unfinished uploads found.';
+
+  @override
+  String drivePendingRemoved(int count) {
+    return '$count unfinished uploads removed from Drive.';
+  }
+
+  @override
+  String drivePendingPartlyRemoved(int removed, int failed) {
+    return '$removed unfinished uploads removed, $failed could not be deleted.';
+  }
+
+  @override
+  String get driveImportTitle => 'Import backup as copies';
+
+  @override
+  String driveImportSummary(int notes, int trash, int images) {
+    return '$notes notes, including $trash in Trash, and $images images. Existing notes will stay in place.';
+  }
+
+  @override
+  String get driveRestorePreferences => 'Restore portable preferences';
+
+  @override
+  String get driveCancel => 'Cancel';
+
+  @override
+  String get driveImportCopies => 'Import copies';
+
+  @override
+  String driveImported(int count) {
+    return 'Imported $count note copies.';
+  }
+
+  @override
+  String driveSnapshotDetails(String time, String size) {
+    return '$time · $size MB';
+  }
+
+  @override
+  String get driveErrorNotConfigured =>
+      'Google Drive is not configured for this build.';
+
+  @override
+  String get driveErrorDenied =>
+      'Google sign-in was denied or closed. Try again and allow Drive access.';
+
+  @override
+  String get driveErrorTimedOut => 'Google sign-in timed out. Try again.';
+
+  @override
+  String get driveErrorNetwork =>
+      'Could not reach Google Drive. Check your connection and try again.';
+
+  @override
+  String get driveErrorIntegrity =>
+      'The downloaded backup failed its integrity check and was not imported.';
+
+  @override
+  String get driveErrorGeneric =>
+      'Could not complete the Drive operation. Check your connection and account, then try again.';
 }

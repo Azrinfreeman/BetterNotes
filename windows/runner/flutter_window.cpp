@@ -1,6 +1,9 @@
 #include "flutter_window.h"
+#include "flutter_accessibility_guard.h"
 
 #include <optional>
+#include <deque>
+#include <map>
 
 #include <flutter/standard_method_codec.h>
 
@@ -14,6 +17,28 @@
 #include "note_clipboard.h"
 
 namespace {
+// Native creates are claimed in order by the parent before the next create.
+// Retain handles only until the first frame, so failed startup can be cleaned
+// up even when the child's Dart channel never registered.
+std::deque<HWND> unclaimed_startup_windows;
+std::map<std::string, HWND> startup_windows;
+
+void RegisterNotePresentation(flutter::FlutterViewController* controller) {
+  HWND hwnd = GetAncestor(controller->view()->GetNativeWindow(), GA_ROOT);
+  unclaimed_startup_windows.push_back(hwnd);
+  auto channel = std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
+      controller->engine()->messenger(), "betternotes/presentation",
+      &flutter::StandardMethodCodec::GetInstance());
+  channel->SetMethodCallHandler([hwnd](const auto& call, auto result) {
+    if (call.method_name() == "showInactive") {
+      ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+      result->Success();
+    } else {
+      result->NotImplemented();
+    }
+  });
+}
+
 constexpr UINT kTrayIconId = 1;
 constexpr UINT_PTR kBalloonTimerId = 7;
 constexpr int kQuickCaptureHotkeyId = 0x4E4E;
@@ -44,6 +69,7 @@ bool FlutterWindow::OnCreate() {
   if (!flutter_controller_->engine() || !flutter_controller_->view()) {
     return false;
   }
+  MarkFlutterViewReady(flutter_controller_->view()->GetNativeWindow());
   RegisterPlugins(flutter_controller_->engine());
   RegisterNoteClipboard(flutter_controller_.get());
   command_channel_ =
@@ -52,6 +78,35 @@ bool FlutterWindow::OnCreate() {
           &flutter::StandardMethodCodec::GetInstance());
   command_channel_->SetMethodCallHandler(
       [this](const auto &call, auto result) {
+        if (call.method_name() == "claimStartupWindow" ||
+            call.method_name() == "releaseStartupWindow" ||
+            call.method_name() == "discardStartupWindow") {
+          const auto* id = std::get_if<std::string>(call.arguments());
+          if (!id) {
+            result->Error("invalid_argument", "Expected a window ID.");
+            return;
+          }
+          if (call.method_name() == "claimStartupWindow") {
+            if (unclaimed_startup_windows.empty()) {
+              result->Error("startup_window", "No new child window to claim.");
+              return;
+            }
+            startup_windows[*id] = unclaimed_startup_windows.front();
+            unclaimed_startup_windows.pop_front();
+          } else {
+            const auto found = startup_windows.find(*id);
+            if (found != startup_windows.end()) {
+              HWND hwnd = found->second;
+              startup_windows.erase(found);
+              if (call.method_name() == "discardStartupWindow" &&
+                  IsWindow(hwnd) && !IsWindowVisible(hwnd)) {
+                DestroyWindow(hwnd);
+              }
+            }
+          }
+          result->Success();
+          return;
+        }
         if (call.method_name() == "getAutoStart") {
           LSTATUS error = ERROR_SUCCESS;
           const auto enabled = IsAutoStartEnabled(&error);
@@ -151,8 +206,10 @@ bool FlutterWindow::OnCreate() {
   DesktopMultiWindowSetWindowCreatedCallback([](void *controller) {
     auto *view_controller =
         reinterpret_cast<flutter::FlutterViewController *>(controller);
+    MarkFlutterViewReady(view_controller->view()->GetNativeWindow());
     RegisterPlugins(view_controller->engine());
     RegisterNoteClipboard(view_controller);
+    RegisterNotePresentation(view_controller);
   });
   taskbar_created_message_ = RegisterWindowMessageW(L"TaskbarCreated");
   SetChildContent(flutter_controller_->view()->GetNativeWindow());

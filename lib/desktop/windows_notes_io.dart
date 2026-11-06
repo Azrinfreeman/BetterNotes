@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../data/reminder_task.dart';
+import '../data/startup_timing.dart';
 import 'tray.dart';
 import 'window_fit.dart';
 import '../data/note.dart';
@@ -17,6 +18,18 @@ import '../state/note_editor_store.dart';
 export 'remote_note_editor_store.dart';
 import 'remote_note_editor_store.dart';
 import '../state/notes_controller.dart';
+
+class _NoteOpenRequest {
+  _NoteOpenRequest(
+    this.id, {
+    required this.activate,
+    required this.retainOnFailure,
+  });
+  final String id;
+  bool activate;
+  final bool retainOnFailure;
+  final result = Completer<void>();
+}
 
 Future<DesktopCoordinator> createDesktopCoordinator() async {
   if (!Platform.isWindows) return DesktopCoordinator._();
@@ -58,8 +71,26 @@ class DesktopCoordinator with WindowListener {
   bool _pushing = false;
   bool _pushAgain = false;
   final Map<String, String> _deliveredStates = {};
-  final Map<String, Future<void>> _openingNotes = {};
-  Future<void> _openTail = Future<void>.value();
+  final Map<String, _NoteOpenRequest> _openingNotes = {};
+  final List<_NoteOpenRequest> _pendingOpens = [];
+  // Native construction is synchronous on the Windows platform thread. Only
+  // the wait for the child's first frame overlaps the next native creation.
+  Future<void> _nativeCreateTail = Future<void>.value();
+  Future<void> _rememberTail = Future<void>.value();
+  int _activeOpens = 0;
+  // Keep native startup pressure bounded. The two-slot diagnostic experiment
+  // did not improve restoration on this engine/plugin combination, so normal
+  // launches wait for each first frame before starting another engine.
+  int _startupConcurrency = 1;
+  int get startupConcurrency => _startupConcurrency;
+  set startupConcurrency(int value) => _startupConcurrency = value.clamp(1, 2);
+  Duration childReadyTimeout = const Duration(seconds: 15);
+  Future<void>? _restoration;
+  bool _restoring = false;
+  bool _diagnosticMode = false;
+  Future<void>? _warming;
+  final Set<String> _abandonedWindows = {};
+  Timer? _firstReminderTimer;
   final Map<String, String?> _assignments = {};
   final Set<String> _readyWindows = {};
   final Map<String, Completer<void>> _readyWaiters = {};
@@ -77,13 +108,22 @@ class DesktopCoordinator with WindowListener {
   ValueListenable<int>? get searchRequests =>
       supportsNoteWindows ? _searchRequests : null;
 
-  Future<void> bindMain(NotesController controller) async {
+  Future<void> bindMain(
+    NotesController controller, {
+    bool diagnosticMode = false,
+  }) async {
     if (!supportsNoteWindows) return;
     _mainController = controller;
+    _diagnosticMode = diagnosticMode;
+    controller.retryWindowRestore = () {
+      if (_restoring) return _restoration ?? Future<void>.value();
+      _restoration = null;
+      return restoreSession();
+    };
     controller.flushDesktopEditors = flushChildren;
     controller.flushDesktopEditor = flushChild;
     controller.applyFastNoteOpening = _applyFastOpening;
-    controller.remindersChanged = _syncReminderTask;
+    controller.remindersChanged = diagnosticMode ? null : _syncReminderTask;
     controller.applyTray = () =>
         DesktopIntegration.setTray(controller.keepInTray);
     controller.applyQuickCapture = () =>
@@ -91,7 +131,7 @@ class DesktopCoordinator with WindowListener {
     final remembered =
         await controller.store.getSetting<List<dynamic>>('openNoteWindows') ??
         const [];
-    _openIds.addAll(remembered.cast<String>());
+    _openIds.addAll(remembered.whereType<String>());
     await windowManager.ensureInitialized();
     await windowManager.setPreventClose(true);
     windowManager.addListener(this);
@@ -134,49 +174,85 @@ class DesktopCoordinator with WindowListener {
     // Reminders: a periodic check also catches ones that came due while the
     // PC slept (the timer fires again on wake) or the app was closed.
     _reminderTimer?.cancel();
-    _reminderTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(_checkReminders()),
-    );
-    Timer(const Duration(seconds: 3), () => unawaited(_checkReminders()));
-    unawaited(_syncReminderTask().catchError((_) {}));
-    await _restoreWindows();
-    // Pay for one native engine before the library becomes interactive. Reuse
-    // this bounded spare for the next open and park an editor when it closes.
-    if (controller.fastNoteOpening) await _warmSpare();
-    await runner.invokeMethod<void>('ready');
+    if (!diagnosticMode) {
+      _reminderTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => unawaited(_checkReminders()),
+      );
+    }
+    if (!diagnosticMode) {
+      _firstReminderTimer = Timer(
+        const Duration(seconds: 3),
+        () => unawaited(_checkReminders()),
+      );
+      unawaited(_syncReminderTask().catchError((_) {}));
+    }
+    StartupTiming.mark('essentialBinding');
   }
 
-  Future<void> _warmSpare() async {
+  /// Called after the main library's first frame. Repeated calls share the
+  /// same restore operation; binding alone never starts a child engine.
+  Future<void> restoreSession() {
+    if (!supportsNoteWindows) return Future<void>.value();
+    return _restoration ??= _startSession();
+  }
+
+  Future<void> _startSession() async {
+    _restoring = true;
+    _mainController!.reportWindowRestoreFailure(null);
+    try {
+      // Launchers can request a hidden initial window. Show the library before
+      // synchronous child engine construction occupies the platform thread.
+      await _showMainWindow();
+      StartupTiming.mark('libraryShown');
+      await const MethodChannel('betternotes/windows')
+          .invokeMethod<void>('ready');
+      await _restoreWindows();
+    } catch (error) {
+      _mainController!.reportWindowRestoreFailure(
+        'Some note windows could not reopen. Open them from the library to retry. $error',
+      );
+    } finally {
+      _restoring = false;
+      StartupTiming.mark('restoreComplete');
+      StartupTiming.report();
+      _scheduleSpareRefill();
+    }
+  }
+
+  Future<void> _warmSpare() =>
+      _warming ??= _createSpare().whenComplete(() => _warming = null);
+
+  Future<void> _createSpare() async {
     try {
       _idleWindow = await _createWindow(null, null);
+      StartupTiming.mark('spareReady');
     } catch (_) {
-      // A spare is optional; normal opening remains available if warming fails.
+      // Optional; a normal cold opening remains available.
     }
   }
 
   /// Creates or releases the idle editor when Fast note opening changes.
-  Future<void> _applyFastOpening() {
-    final operation = _openTail.then((_) async {
-      if (_shuttingDown) return;
-      if (_mainController!.fastNoteOpening) {
-        if (_idleWindow == null) await _warmSpare();
-        return;
+  Future<void> _applyFastOpening() async {
+    await _warming;
+    if (_shuttingDown) return;
+    if (_mainController!.fastNoteOpening) {
+      if (!_restoring && _openingNotes.isEmpty && _idleWindow == null) {
+        await _warmSpare();
       }
-      final spare = _idleWindow;
-      if (spare == null) return;
-      _idleWindow = null;
-      _readyWindows.remove(spare.windowId);
-      _assignments.remove(spare.windowId);
-      _deliveredStates.remove(spare.windowId);
-      try {
-        await spare.invokeMethod<void>('close');
-      } catch (_) {
-        // The idle engine may already be gone.
-      }
-    });
-    _openTail = operation.then<void>((_) {}, onError: (_) {});
-    return operation;
+      return;
+    }
+    final spare = _idleWindow;
+    if (spare == null) return;
+    _idleWindow = null;
+    _readyWindows.remove(spare.windowId);
+    _assignments[spare.windowId] = null;
+    _deliveredStates.remove(spare.windowId);
+    try {
+      await spare.invokeMethod<void>('close').timeout(childReadyTimeout);
+    } catch (_) {
+      // The idle engine may already be gone.
+    }
   }
 
   Future<dynamic> _handleMainCall(MethodCall call) async {
@@ -185,6 +261,7 @@ class DesktopCoordinator with WindowListener {
     switch (call.method) {
       case 'ready':
         final id = args as String;
+        if (_abandonedWindows.remove(id)) return null;
         _readyWindows.add(id);
         _readyWaiters.remove(id)?.complete();
         return null;
@@ -323,20 +400,35 @@ class DesktopCoordinator with WindowListener {
   }
 
   Future<void> _restoreWindows() async {
-    for (final id in _openIds.toList()) {
-      if (_shuttingDown) return;
-      if (_mainController?.noteById(id) == null ||
-          _mainController?.noteById(id)?.archivedAt != null) {
-        _openIds.remove(id);
-        continue;
-      }
-      await openNote(id);
-    }
+    _openIds.removeWhere((id) => !_canOpen(id));
     await _rememberOpenWindows();
+    var failures = 0;
+    await Future.wait([
+      for (final id in _openIds.toList())
+        _queueOpen(id, activate: false).catchError((Object error) {
+          failures++;
+        }),
+    ]);
+    if (failures != 0 && !_shuttingDown) {
+      _mainController!.reportWindowRestoreFailure(
+        '$failures note window(s) could not reopen. Open them from the library to retry.',
+      );
+    }
   }
 
-  Future<void> _rememberOpenWindows() async =>
-      _mainController!.store.setSetting('openNoteWindows', _openIds.toList());
+  bool _canOpen(String id) {
+    final note = _mainController?.noteById(id);
+    return note != null && note.archivedAt == null;
+  }
+
+  Future<void> _rememberOpenWindows() {
+    final snapshot = _openIds.toList();
+    final operation = _rememberTail.then(
+      (_) => _mainController!.store.setSetting('openNoteWindows', snapshot),
+    );
+    _rememberTail = operation.catchError((Object error) {});
+    return operation;
+  }
 
   String? _windowNoteId(WindowController child) {
     if (_assignments.containsKey(child.windowId)) {
@@ -351,30 +443,58 @@ class DesktopCoordinator with WindowListener {
     String? id,
     List<dynamic>? bounds,
   ) async {
-    final child = await WindowController.create(
-      WindowConfiguration(
-        arguments: jsonEncode({
-          'type': 'note',
-          'noteId': id,
-          'parentId': _window!.windowId,
-          'bounds': bounds,
-        }),
-        hiddenAtLaunch: true,
-      ),
-    );
-    _assignments[child.windowId] = id;
-    if (!_readyWindows.contains(child.windowId)) {
-      final waiter = _readyWaiters.putIfAbsent(
-        child.windowId,
-        () => Completer<void>(),
+    final creation = _nativeCreateTail.then((_) async {
+      final child = await StartupTiming.measure(
+        'nativeCreate',
+        () => WindowController.create(
+          WindowConfiguration(
+            arguments: jsonEncode({
+              'type': 'note',
+              'noteId': id,
+              'parentId': _window!.windowId,
+              'bounds': bounds,
+            }),
+            hiddenAtLaunch: true,
+          ),
+        ),
       );
-      try {
-        await waiter.future.timeout(const Duration(seconds: 15));
-      } finally {
-        _readyWaiters.remove(child.windowId);
+      _assignments[child.windowId] = id;
+      // The runner records child HWNDs during synchronous construction. Claim
+      // before starting another create, so a timed-out hidden engine can be
+      // destroyed even if its Dart method handler never came up.
+      await const MethodChannel('betternotes/windows')
+          .invokeMethod<void>('claimStartupWindow', child.windowId);
+      return child;
+    });
+    _nativeCreateTail = creation.then<void>((_) {}, onError: (Object error) {});
+    final child = await creation;
+    try {
+      if (!_readyWindows.contains(child.windowId)) {
+        final waiter = _readyWaiters.putIfAbsent(
+          child.windowId,
+          () => Completer<void>(),
+        );
+        try {
+          await StartupTiming.measure(
+            'childReadyWait',
+            () => waiter.future.timeout(childReadyTimeout),
+          );
+        } finally {
+          _readyWaiters.remove(child.windowId);
+        }
       }
+      await const MethodChannel('betternotes/windows')
+          .invokeMethod<void>('releaseStartupWindow', child.windowId);
+      return child;
+    } catch (_) {
+      _abandonedWindows.add(child.windowId);
+      _assignments[child.windowId] = null;
+      _readyWindows.remove(child.windowId);
+      _deliveredStates.remove(child.windowId);
+      await const MethodChannel('betternotes/windows')
+          .invokeMethod<void>('discardStartupWindow', child.windowId);
+      rethrow;
     }
-    return child;
   }
 
   Future<void> createAndOpenNote() async {
@@ -396,27 +516,60 @@ class DesktopCoordinator with WindowListener {
   }
 
   Future<void> openNote(String id) {
-    if (!supportsNoteWindows || _shuttingDown) return Future<void>.value();
-    // Coalesce repeated clicks and serialize native engine startup. Different
-    // notes still open, but cannot race enumeration or each other's creation.
-    return _openingNotes.putIfAbsent(id, () {
-      final operation = _openTail.then((_) => _openNote(id));
-      _openTail = operation.then<void>(
-        (_) {},
-        onError: (Object error, StackTrace stack) {},
-      );
-      return operation.whenComplete(() {
-        _openingNotes.remove(id);
-      });
-    });
+    return _queueOpen(id, activate: true);
   }
 
-  Future<void> _openNote(String id) async {
+  Future<void> _queueOpen(String id, {required bool activate}) {
+    if (!supportsNoteWindows || _shuttingDown) return Future<void>.value();
+    final existing = _openingNotes[id];
+    if (existing != null) {
+      existing.activate |= activate;
+      return existing.result.future;
+    }
+    final request = _NoteOpenRequest(
+      id,
+      activate: activate,
+      retainOnFailure: _openIds.contains(id),
+    );
+    _openingNotes[id] = request;
+    _pendingOpens.add(request);
+    _drainOpens();
+    return request.result.future;
+  }
+
+  void _drainOpens() {
+    while (_activeOpens < startupConcurrency && _pendingOpens.isNotEmpty) {
+      // User openings take the next available slot ahead of queued restores.
+      final priority = _pendingOpens.indexWhere((request) => request.activate);
+      final request = _pendingOpens.removeAt(priority < 0 ? 0 : priority);
+      _activeOpens++;
+      unawaited(_runOpen(request));
+    }
+  }
+
+  Future<void> _runOpen(_NoteOpenRequest request) async {
+    try {
+      await _openNote(request);
+      request.result.complete();
+    } catch (error, stack) {
+      request.result.completeError(error, stack);
+    } finally {
+      _openingNotes.remove(request.id);
+      _activeOpens--;
+      _drainOpens();
+      _scheduleSpareRefill();
+    }
+  }
+
+  Future<void> _openNote(_NoteOpenRequest request) async {
+    final id = request.id;
     if (!supportsNoteWindows || _shuttingDown) return;
-    if (_mainController!.noteById(id) == null ||
-        _mainController!.noteById(id)?.archivedAt != null) {
+    if (!_canOpen(id)) {
+      _openIds.remove(id);
+      await _rememberOpenWindows();
       return;
     }
+    await _warming;
     for (final existing in await WindowController.getAll()) {
       String? existingNoteId;
       try {
@@ -426,6 +579,14 @@ class DesktopCoordinator with WindowListener {
         continue;
       }
       if (existingNoteId != id) continue;
+      if (!request.activate) {
+        if (_readyWindows.contains(existing.windowId)) {
+          await existing
+              .invokeMethod<void>('present', false)
+              .timeout(childReadyTimeout);
+        }
+        return;
+      }
       try {
         await existing.invokeMethod<void>('focus');
         return;
@@ -441,11 +602,11 @@ class DesktopCoordinator with WindowListener {
         break;
       }
     }
-    _openIds.add(id);
-    await _rememberOpenWindows();
+    if (_openIds.add(id)) await _rememberOpenWindows();
     final bounds = await _mainController!.store.getSetting<List<dynamic>>(
       'windowBounds:$id',
     );
+    if (!_canOpen(id) || _shuttingDown) return;
     WindowController? reused;
     try {
       final spare = _idleWindow;
@@ -457,11 +618,30 @@ class DesktopCoordinator with WindowListener {
           'noteId': id,
           'state': _state(id),
           'bounds': bounds,
+          'activate': request.activate,
         });
       } else {
         final child = await _createWindow(id, bounds);
-        await child.show();
+        if (_shuttingDown) {
+          return; // Shutdown will flush/close this ready editor.
+        }
+        if (!_canOpen(id)) {
+          _assignments[child.windowId] = null;
+          await child
+              .invokeMethod<void>('abort_startup')
+              .timeout(childReadyTimeout);
+          return;
+        }
+        final activate = request.activate;
+        await child
+            .invokeMethod<void>('present', activate)
+            .timeout(childReadyTimeout);
+        // A user may promote a restore while its presentation call is pending.
+        if (!activate && request.activate) {
+          await child.invokeMethod<void>('focus').timeout(childReadyTimeout);
+        }
       }
+      StartupTiming.markOnce('firstNoteVisible');
     } catch (_) {
       if (reused != null) {
         _assignments[reused.windowId] = null;
@@ -475,7 +655,7 @@ class DesktopCoordinator with WindowListener {
           // If the engine died, a retry can use the normal cold-opening path.
         }
       }
-      _openIds.remove(id);
+      if (!request.retainOnFailure) _openIds.remove(id);
       await _rememberOpenWindows();
       rethrow;
     }
@@ -486,6 +666,8 @@ class DesktopCoordinator with WindowListener {
   /// off the opening path, so the next note also opens quickly.
   void _scheduleSpareRefill() {
     if (_shuttingDown ||
+        _restoring ||
+        _openingNotes.isNotEmpty ||
         _idleWindow != null ||
         !(_mainController?.fastNoteOpening ?? false)) {
       return;
@@ -516,13 +698,15 @@ class DesktopCoordinator with WindowListener {
         _pushAgain = false;
         final children = await WindowController.getAll();
         final liveIds = children.map((child) => child.windowId).toSet();
-        _deliveredStates.removeWhere((id, _) => !liveIds.contains(id));
-        _assignments.removeWhere((id, _) => !liveIds.contains(id));
-        _readyWindows.removeWhere((id) => !liveIds.contains(id));
+        if (_openingNotes.isEmpty && _warming == null) {
+          _deliveredStates.removeWhere((id, _) => !liveIds.contains(id));
+          _assignments.removeWhere((id, _) => !liveIds.contains(id));
+          _readyWindows.removeWhere((id) => !liveIds.contains(id));
+        }
         for (final child in children) {
           try {
             final id = _windowNoteId(child);
-            if (id == null) continue;
+            if (id == null || !_readyWindows.contains(child.windowId)) continue;
             final state = _state(id);
             final encoded = jsonEncode(state);
             if (_deliveredStates[child.windowId] == encoded) continue;
@@ -546,6 +730,14 @@ class DesktopCoordinator with WindowListener {
     windowManager.addListener(this);
     await _window!.setWindowMethodHandler((call) async {
       switch (call.method) {
+        case 'abort_startup':
+          // A never-presented editor has no user edits to flush. Reply before
+          // destroying its engine, just like closing a parked editor.
+          Timer.run(() => unawaited(_destroySelf()));
+          return null;
+        case 'present':
+          await _presentChild(call.arguments as bool? ?? true);
+          return null;
         case 'reset':
           await windowManager.hide();
           noteId = null;
@@ -565,8 +757,7 @@ class DesktopCoordinator with WindowListener {
           );
           // Wait for the new keyed editor, so no old note flashes on reuse.
           await WidgetsBinding.instance.endOfFrame;
-          await windowManager.show();
-          await windowManager.focus();
+          await _presentChild(args['activate'] as bool? ?? true);
           return null;
         case 'focus':
           await windowManager.show();
@@ -636,9 +827,17 @@ class DesktopCoordinator with WindowListener {
     if (!isNoteWindow) return;
     await WindowController.fromWindowId(_parentId!)
         .invokeMethod<void>('ready', _window!.windowId);
-    if (noteId != null) {
+    // Presentation belongs to the parent after readiness is acknowledged.
+  }
+
+  Future<void> _presentChild(bool activate) async {
+    if (activate) {
       await windowManager.show();
       await windowManager.focus();
+    } else {
+      // window_manager's Windows implementation ignores its inactive option.
+      await const MethodChannel('betternotes/presentation')
+          .invokeMethod<void>('showInactive');
     }
   }
 
@@ -775,7 +974,17 @@ class DesktopCoordinator with WindowListener {
     _refillTimer?.cancel();
     _reminderTimer?.cancel();
     try {
-      await _openTail;
+      await Future.wait(
+        _openingNotes.values
+            .map(
+              (request) => request.result.future.catchError((Object error) {}),
+            )
+            .toList(),
+      );
+      await _restoration;
+      await _warming;
+      await _nativeCreateTail;
+      await _rememberTail;
       // First save every editor. If one fails, keep all windows available.
       await _mainController!.flushEditors();
       await flushChildren();
@@ -797,7 +1006,7 @@ class DesktopCoordinator with WindowListener {
       for (var attempt = 0; attempt < 30; attempt++) {
         final active = await WindowController.getAll();
         if (active.every((window) => window.arguments.isEmpty)) {
-          windowManager.removeListener(this);
+          await dispose();
           await windowManager.setPreventClose(false);
           await windowManager.close();
           return;
@@ -813,14 +1022,52 @@ class DesktopCoordinator with WindowListener {
       );
       await windowManager.show();
       await windowManager.focus();
+      // Resume pending startup work after a failed save aborts shutdown.
+      if (!_diagnosticMode) {
+        _reminderTimer = Timer.periodic(
+          const Duration(seconds: 30),
+          (_) => unawaited(_checkReminders()),
+        );
+      }
+      _restoration = null;
+      unawaited(restoreSession());
+    }
+  }
+
+  Future<void> quit() => _closeMain();
+
+  /// Release timers/listeners when the owning main engine is finished.
+  Future<void> dispose() async {
+    _shuttingDown = true;
+    _refillTimer?.cancel();
+    _reminderTimer?.cancel();
+    _firstReminderTimer?.cancel();
+    _broadcastTimer?.cancel();
+    _mainController?.removeListener(_broadcast);
+    _mainController?.retryWindowRestore = null;
+    windowManager.removeListener(this);
+    if (supportsNoteWindows) {
+      await _window!.setWindowMethodHandler(null);
+      const MethodChannel('betternotes/windows').setMethodCallHandler(null);
+      await windowManager.setPreventClose(false);
+    }
+  }
+
+  /// Asks a note window to save. A window whose channel is no longer
+  /// registered has already closed or been parked, so it holds nothing unsaved.
+  Future<bool> _flushWindow(WindowController child) async {
+    try {
+      return await child.invokeMethod<bool>('flush') == true;
+    } on WindowChannelException catch (error) {
+      if (error.code == 'CHANNEL_UNREGISTERED') return true;
+      rethrow;
     }
   }
 
   Future<void> flushChildren() async {
     for (final child in await WindowController.getAll()) {
       if (_windowNoteId(child) == null) continue;
-      final acknowledged = await child.invokeMethod<bool>('flush');
-      if (acknowledged != true) {
+      if (!await _flushWindow(child)) {
         throw StateError('A note did not acknowledge its save. Retry.');
       }
     }
@@ -829,7 +1076,7 @@ class DesktopCoordinator with WindowListener {
   Future<void> flushChild(String id) async {
     for (final child in await WindowController.getAll()) {
       if (_windowNoteId(child) != id) continue;
-      if (await child.invokeMethod<bool>('flush') != true) {
+      if (!await _flushWindow(child)) {
         throw StateError('The note could not finish saving. Retry.');
       }
     }

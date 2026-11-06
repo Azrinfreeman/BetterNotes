@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "app_commands.h"
 #include "flutter_window.h"
+#include "flutter_accessibility_guard.h"
 #include "jump_list.h"
 #include "utils.h"
 
@@ -54,6 +55,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   SetCurrentProcessExplicitAppUserModelID(kBetterNotesAppId);
+
+  FlutterAccessibilityGuard accessibility_guard;
+  if (!accessibility_guard.installed()) {
+    ::CoUninitialize();
+    return EXIT_FAILURE;
+  }
 
   flutter::DartProject project(L"data");
   // Child engine creation runs on the Windows platform thread. Keep the main

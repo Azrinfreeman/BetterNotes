@@ -954,5 +954,125 @@
         "type": "int"
       }
     }
-  }
+  },
+  "driveTitle": "Google Drive backup",
+  "driveSubtitle": "Back up or import a verified snapshot",
+  "driveIntro": "Backups are readable ZIP files protected by your Google account. They do not sync changes between devices.",
+  "driveRetentionNote": "The newest 3 backups from this device are kept; backups from other devices are never removed.",
+  "driveAutoTitle": "Back up automatically once a day",
+  "driveAutoSubtitle": "Keeps you signed in on this device and uploads while BetterNotes is open.",
+  "driveAutoOn": "Daily Google Drive backup turned on.",
+  "driveAutoOff": "Daily backup turned off. The saved sign-in is kept until you disconnect.",
+  "driveAutoNeedsSignIn": "Connect Google Drive first.",
+  "driveAutoRunning": "Backing up to Google Drive…",
+  "driveAutoPending": "Waiting for the first automatic backup.",
+  "driveAutoLastAt": "Last automatic backup: {time}",
+  "@driveAutoLastAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driveSessionExpired": "Saved Google sign-in expired. Connect again.",
+  "driveNotConfigured": "Google Drive is not configured for this build.",
+  "driveConnect": "Connect Google Drive",
+  "driveBackupNow": "Back up now",
+  "driveRefresh": "Refresh",
+  "driveCleanPending": "Clean up unfinished uploads",
+  "driveDisconnect": "Disconnect",
+  "driveNoBackups": "No verified backups found.",
+  "driveSnapshotsHeader": "Verified backups",
+  "driveImport": "Import",
+  "driveAccount": "Signed in as {email}",
+  "@driveAccount": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "driveAccountUnknown": "Signed in. The Google account name is unavailable.",
+  "driveCancelSignIn": "Cancel sign-in",
+  "driveSignInCancelled": "Sign-in cancelled.",
+  "driveUploaded": "Backup uploaded and verified.",
+  "driveUploadedPruned": "Backup uploaded and verified. {count} older backups removed.",
+  "@driveUploadedPruned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "drivePruneFailed": "Backup uploaded and verified, but {count} older backups could not be removed.",
+  "@drivePruneFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "drivePendingNone": "No unfinished uploads found.",
+  "drivePendingRemoved": "{count} unfinished uploads removed from Drive.",
+  "@drivePendingRemoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "drivePendingPartlyRemoved": "{removed} unfinished uploads removed, {failed} could not be deleted.",
+  "@drivePendingPartlyRemoved": {
+    "placeholders": {
+      "removed": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "driveImportTitle": "Import backup as copies",
+  "driveImportSummary": "{notes} notes, including {trash} in Trash, and {images} images. Existing notes will stay in place.",
+  "@driveImportSummary": {
+    "placeholders": {
+      "notes": {
+        "type": "int"
+      },
+      "trash": {
+        "type": "int"
+      },
+      "images": {
+        "type": "int"
+      }
+    }
+  },
+  "driveRestorePreferences": "Restore portable preferences",
+  "driveCancel": "Cancel",
+  "driveImportCopies": "Import copies",
+  "driveImported": "Imported {count} note copies.",
+  "@driveImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driveSnapshotDetails": "{time} · {size} MB",
+  "@driveSnapshotDetails": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "driveErrorNotConfigured": "Google Drive is not configured for this build.",
+  "driveErrorDenied": "Google sign-in was denied or closed. Try again and allow Drive access.",
+  "driveErrorTimedOut": "Google sign-in timed out. Try again.",
+  "driveErrorNetwork": "Could not reach Google Drive. Check your connection and try again.",
+  "driveErrorIntegrity": "The downloaded backup failed its integrity check and was not imported.",
+  "driveErrorGeneric": "Could not complete the Drive operation. Check your connection and account, then try again."
 }

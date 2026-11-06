@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:better_notes/data/backup.dart';
 import 'package:better_notes/data/backup_files_io.dart' as files;
 import 'package:better_notes/data/local_store.dart';
+import 'package:better_notes/data/image_shrink.dart';
 import 'package:better_notes/data/note.dart';
 import 'package:better_notes/main.dart';
 import 'package:better_notes/state/notes_controller.dart';
@@ -295,6 +296,62 @@ void main() {
     controller.dispose();
     await db.close();
   });
+
+  test(
+    'portable editor preferences restore immediately and reject invalid values',
+    () async {
+      final db = await databaseFactoryMemory.openDatabase(
+        'backup-preferences.db',
+      );
+      final store = LocalStore.fromDatabase(db);
+      final controller = NotesController(store, null);
+      await controller.load();
+      await controller.setImageQuality(ImageQuality.smallest);
+      await controller.setAlwaysShowNoteHeader(true);
+      await controller.setLibraryOptions(
+        view: LibraryView.archive,
+        sort: NoteSort.title,
+        tags: ['work'],
+        compact: true,
+      );
+      await controller.saveFilter('Work archive', 'meeting');
+      await store.setSetting('autoBackupFolder', 'device-only');
+      final bytes = await controller.exportBackup();
+      final backup = NoteBackup.validate(bytes);
+      expect(backup.preferences['imageQuality'], 'smallest');
+      expect(backup.preferences['alwaysShowNoteHeader'], true);
+      expect(backup.preferences['savedFilters'], hasLength(1));
+      expect(backup.preferences.containsKey('autoBackupFolder'), isFalse);
+      await controller.setImageQuality(ImageQuality.original);
+      await controller.setAlwaysShowNoteHeader(false);
+      await controller.setLibraryOptions(reset: true, compact: false);
+      await controller.deleteFilter('Work archive');
+      await controller.importBackup(
+        backup,
+        restorePreferences: true,
+        expectedOwner: guestOwner,
+      );
+      expect(controller.imageQuality, ImageQuality.smallest);
+      expect(controller.alwaysShowNoteHeader, isTrue);
+      expect(controller.libraryView, LibraryView.archive);
+      expect(controller.noteSort, NoteSort.title);
+      expect(controller.selectedTags, ['work']);
+      expect(controller.compactView, isTrue);
+      expect(controller.savedFilters.single.query, 'meeting');
+      expect(await store.getSetting<String>('imageQuality'), 'smallest');
+      final invalid = rewriteBackup(bytes, (entries) {
+        final manifest =
+            jsonDecode(utf8.decode(entries['manifest.json']!)) as Map;
+        (manifest['preferences'] as Map)['imageQuality'] = 'invalid';
+        entries['manifest.json'] = Uint8List.fromList(
+          utf8.encode(jsonEncode(manifest)),
+        );
+      });
+      expect(() => NoteBackup.validate(invalid), throwsFormatException);
+      controller.dispose();
+      await db.close();
+    },
+  );
 
   test('invalid backups change nothing; missing assets, hashes, paths, version and content are rejected', () async {
     final db = await databaseFactoryMemory.openDatabase('backup-validation.db');

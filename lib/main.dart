@@ -13,6 +13,9 @@ import 'package:window_manager/window_manager.dart';
 import 'ui/review_notebook.dart';
 import 'l10n/l10n.dart';
 import 'data/app_log.dart';
+import 'data/startup_timing.dart';
+import 'desktop/startup_benchmark_stub.dart'
+    if (dart.library.io) 'desktop/startup_benchmark_io.dart';
 import 'data/local_store.dart';
 import 'desktop/windows_notes_stub.dart'
     if (dart.library.io) 'desktop/windows_notes_io.dart'
@@ -32,6 +35,43 @@ const _supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  StartupTiming.mark('dartEntry');
+  final benchmark = arguments
+      .where((arg) => arg.startsWith('--startup-benchmark='))
+      .firstOrNull;
+  if (benchmark != null && arguments.contains('--ui-review')) {
+    final count = int.parse(benchmark.split('=').last).clamp(0, 20);
+    final output = arguments
+        .firstWhere((arg) => arg.startsWith('--benchmark-output='))
+        .substring('--benchmark-output='.length);
+    final controller = await createStartupBenchmarkNotebook(count);
+    StartupTiming.enabled = true;
+    StartupTiming.mark('fixtureReady');
+    final windows = await desktop.createDesktopCoordinator();
+    windows.startupConcurrency = arguments.contains('--startup-concurrency=2')
+        ? 2
+        : 1;
+    await windows.bindMain(controller, diagnosticMode: true);
+    StartupTiming.mark('bound');
+    runApp(
+      BetterNotesApp(controller: controller, openNoteWindow: windows.openNote),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      StartupTiming.mark('mainFirstFrame');
+      await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+      StartupTiming.mark('mainRasterized');
+      await windows.restoreSession();
+      await writeStartupBenchmark(output, {
+        'notes': count,
+        ...StartupTiming.snapshot,
+      });
+      if (!arguments.contains('--benchmark-stay-open')) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        await windows.quit();
+      }
+    });
+    return;
+  }
   if (arguments.contains('--ui-review')) {
     final controller = await createReviewNotebook();
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
@@ -108,9 +148,12 @@ Future<void> _launchMain(
   LocalStore? store;
   final NotesController controller;
   try {
-    store = await LocalStore.open();
+    store = await StartupTiming.measure<LocalStore>(
+      'databaseOpen',
+      LocalStore.open,
+    );
     controller = NotesController(store, cloud);
-    await controller.load();
+    await StartupTiming.measure('controllerLoad', controller.load);
   } catch (error, stack) {
     AppLog.write('ERROR', 'Startup failed', error, stack);
     try {
@@ -133,15 +176,46 @@ Future<void> _launchMain(
     // Started by the reminders scheduled task: leave quietly if nothing is due.
     await windows.quitIfNoRemindersDue(controller);
   }
-  await windows.bindMain(controller);
+  var desktopReady = true;
+  try {
+    await windows.bindMain(controller);
+  } catch (error, stack) {
+    desktopReady = false;
+    AppLog.write('ERROR', 'Desktop startup failed', error, stack);
+    try {
+      await windows.dispose();
+    } catch (cleanupError, cleanupStack) {
+      // A failed binding may also leave its channel unavailable for cleanup.
+      // The local library must still render even when native teardown fails.
+      AppLog.write(
+        'ERROR',
+        'Desktop cleanup failed',
+        cleanupError,
+        cleanupStack,
+      );
+    }
+    controller.reportWindowRestoreFailure(
+      'Note windows could not start. You can use the library; restart BetterNotes to retry.',
+    );
+  }
   runApp(
     BetterNotesApp(
       controller: controller,
-      openNoteWindow: windows.supportsNoteWindows ? windows.openNote : null,
+      openNoteWindow: desktopReady && windows.supportsNoteWindows
+          ? windows.openNote
+          : null,
       searchRequests: windows.searchRequests,
     ),
   );
-  if (arguments.contains('--new-note') && windows.supportsNoteWindows) {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    StartupTiming.mark('mainFirstFrame');
+    await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+    StartupTiming.mark('mainRasterized');
+    if (desktopReady) await windows.restoreSession();
+  });
+  if (desktopReady &&
+      arguments.contains('--new-note') &&
+      windows.supportsNoteWindows) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(windows.createAndOpenNote());
     });

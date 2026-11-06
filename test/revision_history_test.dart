@@ -154,6 +154,31 @@ void main() {
     await db.close();
   });
 
+  test('backup fails when a saved version image is missing', () async {
+    final (controller, store, db) = await _open('rev-missing-image');
+    final note = await controller.create();
+    await store.addRevision(
+      NoteRevision.capture(
+        note.copyWith(images: ['missing-image']),
+        'rev-1',
+        DateTime.now(),
+      ),
+    );
+    await expectLater(
+      controller.exportBackup(),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('saved version is missing'),
+        ),
+      ),
+    );
+    expect(await store.revisionsFor(note.id), hasLength(1));
+    controller.dispose();
+    await db.close();
+  });
+
   test('backups without history stay version 1 and still import', () async {
     final (controller, _, db) = await _open('rev-v1');
     await controller.create();

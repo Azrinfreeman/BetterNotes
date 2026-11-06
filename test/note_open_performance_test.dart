@@ -113,7 +113,7 @@ void main() {
   });
 
   test(
-    'native openings coalesce, serialize and recover from failure',
+    'native openings coalesce, reuse one spare and recover from failure',
     () async {
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -205,12 +205,16 @@ void main() {
         }
         return null;
       });
-      messenger.setMockMethodCallHandler(managerChannel, (_) async => null);
+      messenger.setMockMethodCallHandler(
+        managerChannel,
+        (call) async => call.method == 'isMinimized' ? false : null,
+      );
       messenger.setMockMethodCallHandler(runnerChannel, (_) async => null);
       final db = await databaseFactoryMemory.openDatabase('open-native.db');
       final controller = NotesController(LocalStore.fromDatabase(db), null);
       final coordinator = await createDesktopCoordinator();
       addTearDown(() async {
+        await coordinator.dispose();
         controller.dispose();
         windowManager.removeListener(coordinator);
         await WindowController.fromWindowId('main')
@@ -229,7 +233,10 @@ void main() {
       final first = await controller.create();
       final second = await controller.create();
       final third = await controller.create();
-      await coordinator.bindMain(controller);
+      await coordinator.bindMain(controller, diagnosticMode: true);
+      expect(creates, 0); // Binding never waits for a spare or restored editor.
+      await coordinator.restoreSession();
+      await controller.applyFastNoteOpening!();
       expect(creates, 1); // One ready spare, with no note record created.
       expect(controller.notes, hasLength(3));
       await coordinator.flushChildren();
@@ -259,7 +266,7 @@ void main() {
       focusReady = false;
       await coordinator.openNote(first.id);
       expect(creates, 2);
-      expect(nativeShows, 2);
+      expect(nativeShows, 1); // Only the fallback shows through the native API.
       focusReady = true;
       fail = true;
       await expectLater(
@@ -297,6 +304,45 @@ void main() {
     },
     skip: !Platform.isWindows,
   );
+
+  testWidgets('window restoration Retry remains separate from save Retry', (
+    tester,
+  ) async {
+    final db = await tester.runAsync(
+      () => databaseFactoryMemory.openDatabase('restore-retry-ui'),
+    );
+    final controller = (await tester.runAsync(() async {
+      final controller = NotesController(LocalStore.fromDatabase(db!), null);
+      await controller.load();
+      return controller;
+    }))!;
+    addTearDown(
+      () => tester.runAsync(() async {
+        controller.dispose();
+        await db!.close();
+      }),
+    );
+    var retries = 0;
+    controller.reportSaveFailure('An unsaved edit');
+    controller.reportWindowRestoreFailure('A note window could not reopen');
+    controller.retryWindowRestore = () async {
+      retries++;
+      controller.reportWindowRestoreFailure(null);
+    };
+    await tester.pumpWidget(BetterNotesApp(controller: controller));
+    await tester.pumpAndSettle();
+    final notice = find.ancestor(
+      of: find.text('A note window could not reopen'),
+      matching: find.byType(ListTile),
+    );
+    await tester.tap(find.descendant(of: notice, matching: find.text('Retry')));
+    await tester.pumpAndSettle();
+    expect(retries, 1);
+    expect(controller.windowRestoreFailure, isNull);
+    expect(controller.saveFailure, 'An unsaved edit');
+    expect(find.text('An unsaved edit'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   test('reused remote editors reject state from a previous note', () {
     final remote = RemoteNoteEditorStore(
