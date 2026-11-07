@@ -110,7 +110,7 @@ flutter test
 ## Documentation
 
 - [User guide](docs/USER_GUIDE.md): features, keyboard shortcuts, backups, and sync setup
-- [Implementation plan](IMPLEMENTATION.md): startup work and earlier feature plans
+- [Cloud backup plan](CLOUD_BACKUP_IMPLEMENTATION.md): Google Drive and iCloud backup design
 - [Status](STATUS.md): development log and verification notes
 - [Startup and note restoration](docs/tutorial/startup-and-note-restoration.md): scheduling, failure recovery, diagnostics, and native benchmarks
 
