@@ -83,6 +83,12 @@ flutter run -d windows                 # Windows desktop
 flutter run -d chrome --web-port 5173  # Web
 ```
 
+To build the public browser demo, run `flutter build web --base-href /BetterNotes/demo/`.
+The demo keeps notes in browser storage and opens without an account. The
+**BetterNotes web demo** workflow deploys the current `docs/` site alongside
+the app at `/BetterNotes/demo/`. For the first deployment, switch the
+repository's Pages source from the `docs/` branch folder to **GitHub Actions**.
+
 Without any configuration, the app runs entirely offline. To enable Google account sync, follow [Connect Google account sync](docs/USER_GUIDE.md#connect-google-account-sync), then pass your own Supabase project values:
 
 ```powershell
